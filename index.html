@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#1e3a5f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Roltes System</title>
+  <style>
+    /* ── RESET & VARIABLES ─────────────────────────────── */
+    :root {
+      --primary:   #1e3a5f;
+      --primary-d: #162d49;
+      --accent:    #2563eb;
+      --bg:        #f1f5f9;
+      --card:      #ffffff;
+      --text:      #0f172a;
+      --muted:     #64748b;
+      --border:    #e2e8f0;
+      --radius:    10px;
+      --shadow:    0 1px 3px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 14px rgba(0,0,0,.11);
+      --hdr:       54px;
+      /* status */
+      --nowe:    #ef4444;
+      --prod:    #1e293b;
+      --oczek:   #f97316;
+      --gotowe:  #22c55e;
+      --zreal:   #94a3b8;
+      --wazny:   #2563eb;
+    }
+    *,*::before,*::after { box-sizing: border-box; margin:0; padding:0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 15px; min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button, select, input, textarea {
+      font-family: inherit; font-size: inherit;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────── */
+    .hdr {
+      position: fixed; top:0; left:0; right:0;
+      height: var(--hdr); background: var(--primary);
+      color: #fff; display: flex; align-items: center;
+      gap: 4px; padding: 0 8px; z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .hdr-back {
+      width:40px; height:40px; border:none; background:none;
+      color:#fff; font-size:1.4rem; cursor:pointer;
+      display:none; align-items:center; justify-content:center;
+      border-radius:8px; flex-shrink:0;
+    }
+    .hdr-back.vis { display:flex; }
+    .hdr-title {
+      flex:1; font-size:1rem; font-weight:700;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .hdr-title small { font-weight:400; font-size:.82rem; opacity:.65; }
+    .hdr-btn {
+      width:40px; height:40px; border:none; background:none;
+      color:rgba(255,255,255,.85); font-size:1.1rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:8px; transition:background .15s; flex-shrink:0;
+    }
+    .hdr-btn:hover { background:rgba(255,255,255,.15); }
+
+    /* ── MAIN ───────────────────────────────────────────── */
+    #main {
+      padding-top: calc(var(--hdr) + 12px);
+      padding-bottom: 24px; min-height:100vh;
+    }
+    #main.no-hdr { padding-top: 0; }
+    .page { padding: 0 12px; }
+
+    /* ── LOGIN ──────────────────────────────────────────── */
+    .login-wrap {
+      position:fixed; inset:0;
+      background: linear-gradient(145deg, #1e3a5f 0%, #1e40af 100%);
+      display:flex; align-items:center; justify-content:center;
+      z-index:200;
+    }
+    .login-box {
+      background:#fff; border-radius:18px;
+      padding:36px 28px 32px;
+      width:calc(100% - 40px); max-width:340px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.3);
+      text-align:center;
+    }
+    .login-logo {
+      font-size:2.2rem; font-weight:900;
+      letter-spacing:.08em; color:var(--primary);
+      margin-bottom:2px;
+    }
+    .login-sub { color:var(--muted); font-size:.8rem; margin-bottom:28px; }
+    .login-box input {
+      width:100%; padding:13px 16px;
+      border:1.5px solid var(--border); border-radius:10px;
+      font-size:.97rem; margin-bottom:10px; outline:none;
+      transition:border-color .2s;
+    }
+    .login-box input:focus { border-color:var(--accent); }
+    .login-box input.err { border-color:var(--nowe); }
+    .btn-login {
+      width:100%; padding:13px;
+      background:var(--primary); color:#fff;
+      border:none; border-radius:10px;
+      font-size:.97rem; font-weight:700; cursor:pointer;
+      transition:background .2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-login:hover { background:var(--primary-d); }
+    .login-err { color:var(--nowe); font-size:.8rem; margin-top:10px; min-height:18px; }
+
+    /* ── DASHBOARD TILES ─────────────────────────────────── */
+    .tile-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:12px;
+      padding:0 12px;
+    }
+    @media(min-width:600px){ .tile-grid { grid-template-columns:repeat(3,1fr); } }
+    .tile {
+      background:var(--card); border-radius:14px;
+      padding:20px 16px; box-shadow:var(--shadow);
+      cursor:pointer; transition:box-shadow .15s, transform .1s;
+      display:flex; flex-direction:column; gap:10px;
+      border:1px solid var(--border);
+    }
+    .tile:active { transform:scale(.97); }
+    .tile:hover  { box-shadow:var(--shadow-md); }
+    .tile-icon {
+      width:46px; height:46px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.5rem;
+    }
+    .tile-name { font-weight:700; font-size:.95rem; }
+    .tile-desc { font-size:.78rem; color:var(--muted); line-height:1.4; }
+    .tile-count {
+      font-size:1.4rem; font-weight:800; color:var(--accent);
+    }
+    .ic-purple { background:#ede9fe; }
+    .ic-blue   { background:#dbeafe; }
+    .ic-orange { background:#ffedd5; }
+
+    /* ── ORDER LIST ─────────────────────────────────────── */
+    .list-toolbar {
+      display:flex; gap:8px; align-items:center;
+      padding:0 12px; margin-bottom:10px;
+    }
+    .btn-new {
+      background:var(--accent); color:#fff;
+      border:none; border-radius:20px;
+      padding:8px 16px; font-size:.85rem; font-weight:700;
+      cursor:pointer; white-space:nowrap;
+      transition:background .15s;
+    }
+    .btn-new:hover { background:#1d4ed8; }
+    .btn-filter {
+      background:var(--card); color:var(--muted);
+      border:1.5px solid var(--border); border-radius:20px;
+      padding:7px 14px; font-size:.83rem; font-weight:600;
+      cursor:pointer; display:flex; align-items:center; gap:5px;
+      transition:border-color .15s;
+    }
+    .btn-filter.active { border-color:var(--accent); color:var(--accent); }
+    .filter-badge {
+      background:var(--accent); color:#fff;
+      border-radius:50%; width:18px; height:18px;
+      font-size:.68rem; font-weight:800;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .filter-panel {
+      background:var(--card); border-radius:var(--radius);
+      margin:0 12px 10px; padding:10px 12px;
+      box-shadow:var(--shadow); border:1px solid var(--border);
+    }
+    .filter-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .filter-row:last-child { margin-bottom:0; }
+    .filter-chip {
+      padding:5px 12px; border-radius:16px;
+      border:1.5px solid var(--border); background:var(--bg);
+      color:var(--muted); font-size:.78rem; font-weight:600;
+      cursor:pointer; transition:all .15s; white-space:nowrap;
+    }
+    .filter-chip.on {
+      border-color:var(--accent); background:var(--accent); color:#fff;
+    }
+    .filter-select {
+      padding:7px 10px; border-radius:8px;
+      border:1.5px solid var(--border); background:var(--bg);
+      color:var(--text); font-size:.82rem; outline:none; cursor:pointer;
+    }
+    .filter-input {
+      flex:1; padding:7px 10px; border-radius:8px;
+      border:1.5px solid var(--border); background:var(--bg);
+      color:var(--text); font-size:.82rem; outline:none; min-width:120px;
+    }
+    .filter-input:focus, .filter-select:focus { border-color:var(--accent); }
+
+    .order-list { display:flex; flex-direction:column; gap:6px; padding:0 12px; }
+
+    .order-card {
+      border-radius:var(--radius);
+      border:1.5px solid transparent;
+      background:var(--card);
+      padding:8px 11px;
+      box-shadow:var(--shadow);
+      cursor:pointer;
+      transition:box-shadow .15s;
+    }
+    .order-card:active { opacity:.87; }
+    .order-card-top {
+      display:flex; align-items:center; gap:6px; margin-bottom:3px;
+      flex-wrap:wrap;
+    }
+    .order-num { font-weight:800; font-size:.9rem; }
+    .order-card-mid { margin-bottom:2px; }
+    .order-client { font-size:.83rem; font-weight:600; }
+    .order-product { font-size:.73rem; color:var(--muted); }
+    .order-card-bot {
+      display:flex; justify-content:space-between; align-items:center;
+      font-size:.7rem; color:var(--muted);
+    }
+
+    /* ── BADGES ─────────────────────────────────────────── */
+    .badge {
+      display:inline-flex; align-items:center;
+      padding:3px 8px; border-radius:6px;
+      font-size:.7rem; font-weight:700;
+      color:#fff; white-space:nowrap;
+    }
+    .badge-wazny { background:#2563eb; }
+    .badge-role-administrator { background:#7c3aed; }
+    .badge-role-kierownik     { background:#1e3a5f; }
+    .badge-role-produkcja     { background:#0284c7; }
+    .badge-role-biuro         { background:#059669; }
+    .badge-role-readonly      { background:#94a3b8; }
+    .badge-inactive           { background:#ef4444; }
+
+    /* ── ORDER DETAIL ───────────────────────────────────── */
+    .det-section {
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:var(--shadow); margin-bottom:10px;
+      overflow:hidden;
+    }
+    .det-section-title {
+      font-size:.72rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--muted);
+      padding:12px 16px 0;
+    }
+    .det-field {
+      padding:10px 16px; border-bottom:1px solid var(--border);
+    }
+    .det-field:last-child { border-bottom:none; }
+    .det-field label {
+      display:block; font-size:.71rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.05em;
+      color:var(--muted); margin-bottom:4px;
+    }
+    .det-field input,
+    .det-field select,
+    .det-field textarea {
+      width:100%; border:none; outline:none;
+      font-size:.95rem; color:var(--text);
+      background:transparent; padding:0;
+      resize:vertical;
+    }
+    .det-field textarea { min-height:72px; }
+    .det-field input[readonly],
+    .det-field select[disabled],
+    .det-field textarea[readonly] {
+      color:var(--muted);
+    }
+    .det-field .field-val { font-size:.95rem; }
+
+    /* status buttons row */
+    .status-row { display:flex; gap:6px; flex-wrap:wrap; }
+    .status-btn {
+      flex:1; min-width:0; padding:9px 4px;
+      border-radius:8px; border:2px solid var(--border);
+      background:var(--card); cursor:pointer;
+      font-size:.72rem; font-weight:700; text-align:center;
+      transition:all .15s; color:var(--muted); white-space:nowrap;
+    }
+    .status-btn.active { color:#fff; border-color:transparent; }
+
+    /* photos */
+    .photo-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+      padding:12px 16px;
+    }
+    .photo-thumb {
+      aspect-ratio:1; border-radius:8px;
+      overflow:hidden; background:var(--border); position:relative;
+    }
+    .photo-thumb img { width:100%; height:100%; object-fit:cover; cursor:pointer; }
+    .photo-del {
+      position:absolute; top:3px; right:3px;
+      background:rgba(0,0,0,.6); color:#fff;
+      border:none; border-radius:50%; width:22px; height:22px;
+      font-size:.65rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .photo-add {
+      aspect-ratio:1; border-radius:8px;
+      border:2px dashed var(--border); background:var(--bg);
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:3px; cursor:pointer;
+      color:var(--muted); font-size:.72rem;
+    }
+    .photo-add-icon { font-size:1.3rem; }
+    .file-input-hidden { display:none; }
+
+    /* log */
+    .log-list { padding:0 16px 12px; }
+    .log-item {
+      padding:7px 0; border-bottom:1px solid var(--border);
+      font-size:.78rem; color:var(--muted);
+    }
+    .log-item:last-child { border-bottom:none; }
+    .log-who { font-weight:700; color:var(--text); }
+    .log-time { font-size:.7rem; opacity:.7; }
+
+    /* ── MATERIALS VIEW ─────────────────────────────────── */
+    .mat-group {
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:var(--shadow); margin-bottom:10px;
+      border-left:4px solid var(--oczek);
+      cursor:pointer; transition:box-shadow .15s;
+    }
+    .mat-group:active { opacity:.87; }
+    .mat-head {
+      padding:12px 14px 8px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .mat-order-num { font-weight:800; font-size:.97rem; }
+    .mat-client { font-size:.82rem; color:var(--muted); }
+    .mat-body {
+      padding:0 14px 12px;
+      font-size:.88rem; color:var(--text);
+      white-space:pre-wrap; line-height:1.5;
+    }
+
+    /* ── ADMIN PANEL ─────────────────────────────────────── */
+    .admin-tabs {
+      display:flex; gap:0; margin-bottom:14px;
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:var(--shadow); overflow:hidden;
+    }
+    .admin-tab {
+      flex:1; padding:12px 8px; border:none;
+      background:none; cursor:pointer; font-size:.82rem;
+      font-weight:600; color:var(--muted);
+      border-bottom:2.5px solid transparent;
+      transition:all .15s;
+    }
+    .admin-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    .user-card {
+      background:var(--card); border-radius:var(--radius);
+      padding:13px 14px; box-shadow:var(--shadow);
+      display:flex; align-items:center; gap:10px;
+      margin-bottom:8px;
+    }
+    .user-avatar {
+      width:38px; height:38px; border-radius:50%;
+      background:var(--primary); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:.88rem; flex-shrink:0;
+    }
+    .user-info { flex:1; min-width:0; }
+    .user-name  { font-weight:700; font-size:.93rem; }
+    .user-uname { font-size:.75rem; color:var(--muted); }
+
+    .drive-card {
+      background:var(--card); border-radius:var(--radius);
+      padding:16px; box-shadow:var(--shadow); margin-bottom:10px;
+    }
+    .drive-label { font-size:.82rem; color:var(--muted); margin-bottom:8px; }
+    .drive-bar-wrap { background:var(--border); border-radius:4px; height:8px; overflow:hidden; }
+    .drive-bar { height:100%; border-radius:4px; background:var(--accent); transition:width .5s; }
+    .drive-bar.warn   { background:var(--oczek); }
+    .drive-bar.danger { background:var(--nowe); }
+
+    .config-list { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .config-item {
+      padding:12px 14px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:8px;
+    }
+    .config-item:last-child { border-bottom:none; }
+    .config-item-label { flex:1; font-size:.93rem; }
+    .btn-cfg-del {
+      background:none; border:none; color:var(--nowe);
+      cursor:pointer; font-size:.85rem; padding:4px 8px;
+    }
+
+    .role-desc-card {
+      background:var(--card); border-radius:var(--radius);
+      padding:12px 14px; box-shadow:var(--shadow);
+      margin-bottom:8px;
+      border-left:3px solid var(--accent);
+    }
+    .role-desc-name { font-weight:700; font-size:.92rem; margin-bottom:3px; }
+    .role-desc-text { font-size:.78rem; color:var(--muted); line-height:1.5; }
+
+    /* ── MODAL (bottom sheet) ────────────────────────────── */
+    .modal-bg {
+      position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:100; display:flex; align-items:flex-end;
+      opacity:0; pointer-events:none; transition:opacity .2s;
+    }
+    .modal-bg.open { opacity:1; pointer-events:all; }
+    .modal-sheet {
+      width:100%; background:var(--card);
+      border-radius:18px 18px 0 0;
+      padding:16px 16px 40px;
+      transform:translateY(100%);
+      transition:transform .25s ease;
+      max-height:92vh; overflow-y:auto;
+    }
+    .modal-bg.open .modal-sheet { transform:translateY(0); }
+    .modal-handle {
+      width:40px; height:4px; border-radius:2px;
+      background:var(--border); margin:0 auto 14px;
+    }
+    .modal-title { font-size:1.05rem; font-weight:700; margin-bottom:14px; }
+    .modal-field { margin-bottom:12px; }
+    .modal-field label {
+      display:block; font-size:.72rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.05em;
+      color:var(--muted); margin-bottom:5px;
+    }
+    .modal-field input,
+    .modal-field select,
+    .modal-field textarea {
+      width:100%; padding:11px 14px;
+      border:1.5px solid var(--border); border-radius:8px;
+      font-size:.95rem; outline:none;
+      background:var(--bg); transition:border-color .2s;
+    }
+    .modal-field input:focus,
+    .modal-field select:focus,
+    .modal-field textarea:focus { border-color:var(--accent); background:#fff; }
+    .modal-field textarea { min-height:72px; resize:vertical; }
+    .modal-btns { display:flex; gap:8px; margin-top:14px; }
+    .modal-btns button { flex:1; }
+    .modal-err {
+      color:var(--nowe); font-size:.78rem; margin-top:6px;
+      text-align:center; min-height:16px;
+    }
+
+    /* ── BUTTONS ────────────────────────────────────────── */
+    .btn {
+      padding:12px 20px; border-radius:8px; border:none;
+      font-size:.9rem; font-weight:700; cursor:pointer;
+      transition:opacity .15s, transform .1s;
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    }
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-primary { background:var(--accent); color:#fff; width:100%; }
+    .btn-danger  { background:var(--nowe);   color:#fff; width:100%; }
+    .btn-ghost   { background:var(--bg); color:var(--muted); border:1.5px solid var(--border); width:100%; }
+    .btn-sm      { padding:8px 14px; font-size:.8rem; }
+    .btn-icon    { width:36px; height:36px; padding:0; border-radius:8px; }
+
+    /* ── UTILS ──────────────────────────────────────────── */
+    .section-label {
+      font-size:.72rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--muted);
+      margin:14px 0 6px; padding:0 12px;
+    }
+    .empty-state {
+      text-align:center; padding:52px 24px; color:var(--muted);
+    }
+    .empty-icon { font-size:3rem; margin-bottom:10px; }
+    .empty-text { font-size:.88rem; }
+
+    .toast {
+      position:fixed; bottom:80px; left:50%;
+      transform:translateX(-50%) translateY(16px);
+      background:#0f172a; color:#fff;
+      padding:9px 18px; border-radius:20px;
+      font-size:.82rem; opacity:0; transition:all .22s;
+      z-index:300; white-space:nowrap; pointer-events:none;
+    }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spinner {
+      width:18px; height:18px;
+      border:2.5px solid rgba(255,255,255,.3);
+      border-top-color:#fff; border-radius:50%;
+      animation:spin .55s linear infinite;
+      display:inline-block;
+    }
+    .loading-cover {
+      position:fixed; inset:0;
+      background:rgba(255,255,255,.65);
+      display:flex; align-items:center; justify-content:center;
+      z-index:150;
+    }
+    .loading-cover .ring {
+      width:40px; height:40px;
+      border:3px solid var(--border);
+      border-top-color:var(--accent);
+      border-radius:50%; animation:spin .7s linear infinite;
+    }
+    .hidden { display:none!important; }
+    .mt8  { margin-top:8px; }
+    .mt12 { margin-top:12px; }
+    .divider { height:1px; background:var(--border); margin:10px 0; }
+
+    /* image fullscreen */
+    .img-fs {
+      position:fixed; inset:0; background:#000;
+      z-index:250; display:flex; align-items:center;
+      justify-content:center; cursor:pointer;
+    }
+    .img-fs.hidden { display:none; }
+    .img-fs img { max-width:100%; max-height:100%; object-fit:contain; }
+    .img-fs-close {
+      position:absolute; top:14px; right:14px;
+      background:rgba(255,255,255,.2); border:none; color:#fff;
+      width:36px; height:36px; border-radius:50%;
+      font-size:1.1rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* confirm dialog */
+    .confirm-modal {
+      position:fixed; inset:0; background:rgba(0,0,0,.5);
+      z-index:200; display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:opacity .2s;
+    }
+    .confirm-modal.open { opacity:1; pointer-events:all; }
+    .confirm-box {
+      background:var(--card); border-radius:16px;
+      padding:24px 20px; width:calc(100%-40px); max-width:320px;
+      box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center;
+    }
+    .confirm-title { font-weight:700; font-size:1rem; margin-bottom:8px; }
+    .confirm-text  { font-size:.85rem; color:var(--muted); margin-bottom:18px; }
+    .confirm-btns  { display:flex; gap:8px; }
+    .confirm-btns button { flex:1; }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-cover" id="loading"><div class="ring"></div></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Image fullscreen -->
+<div class="img-fs hidden" id="img-fs" onclick="closeImg()">
+  <button class="img-fs-close">✕</button>
+  <img id="img-full" src="" alt="">
+</div>
+
+<!-- Confirm dialog -->
+<div class="confirm-modal" id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Czy na pewno?</div>
+    <div class="confirm-text"  id="confirm-text"></div>
+    <div class="confirm-btns">
+      <button class="btn btn-ghost btn-sm" onclick="confirmResolve(false)">Anuluj</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok" onclick="confirmResolve(true)">Usuń</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP
+══════════════════════════════════════════════════════════ -->
+<div id="app">
+  <!-- Header -->
+  <div class="hdr hidden" id="hdr">
+    <button class="hdr-back" id="hdr-back" onclick="goBack()">‹</button>
+    <div class="hdr-title" id="hdr-title">ROLTES</div>
+    <button class="hdr-btn" id="hdr-admin" onclick="navigate('admin')" title="Admin" style="display:none">⚙</button>
+    <button class="hdr-btn" onclick="doLogout()" title="Wyloguj">⏻</button>
+  </div>
+
+  <!-- Dynamic content -->
+  <div id="main" class="no-hdr"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL — Nowe zamówienie
+══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modal-order" onclick="closeMBg(event,'modal-order')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="mo-title">Nowe zamówienie</div>
+    <div class="modal-field">
+      <label>Numer zamówienia *</label>
+      <input type="text" id="mo-num" placeholder="np. 001/08/2026" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label>Zamawiający *</label>
+      <input type="text" id="mo-client" placeholder="Firma lub Imię Nazwisko" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label>Data zamówienia</label>
+      <input type="date" id="mo-date">
+    </div>
+    <div class="modal-field">
+      <label>Rodzaj produktu</label>
+      <select id="mo-product"></select>
+    </div>
+    <div class="modal-field">
+      <label>Kolor materiału</label>
+      <select id="mo-color"></select>
+    </div>
+    <div class="modal-field">
+      <label>Planowana data montażu/wysyłki</label>
+      <input type="date" id="mo-planned">
+    </div>
+    <div class="modal-field">
+      <label>Numer trasy</label>
+      <input type="text" id="mo-route" placeholder="np. T-01" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label>Priorytet</label>
+      <select id="mo-priority">
+        <option value="normalny">Normalny</option>
+        <option value="wazny">⚑ Ważny</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Zdjęcia</label>
+      <div id="mo-photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px"></div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px;cursor:pointer;color:var(--muted);font-size:.88rem;font-weight:600;text-transform:none;letter-spacing:0">
+        <span style="font-size:1.4rem">📷</span> Dodaj zdjęcia (galeria lub aparat)
+        <input type="file" id="mo-photos" accept="image/*" multiple style="display:none" onchange="handleMoPhotos(this)">
+      </label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modal-order')">Anuluj</button>
+      <button class="btn btn-primary" id="mo-save" onclick="createOrder()">Utwórz</button>
+    </div>
+    <div class="modal-err" id="mo-err"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL — Użytkownik
+══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modal-user" onclick="closeMBg(event,'modal-user')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="mu-title">Nowy użytkownik</div>
+    <div class="modal-field">
+      <label>Imię i nazwisko *</label>
+      <input type="text" id="mu-name" placeholder="Jan Kowalski" autocomplete="off">
+    </div>
+    <div class="modal-field" id="mu-uname-wrap">
+      <label>Nazwa użytkownika (login) *</label>
+      <input type="text" id="mu-uname" placeholder="jkowalski" autocomplete="off">
+    </div>
+    <div class="modal-field" id="mu-pass-wrap">
+      <label>Hasło *</label>
+      <input type="password" id="mu-pass" placeholder="min. 8 znaków" autocomplete="new-password">
+    </div>
+    <div class="modal-field">
+      <label>Rola</label>
+      <select id="mu-role">
+        <option value="administrator">Administrator</option>
+        <option value="kierownik">Kierownik</option>
+        <option value="produkcja" selected>Produkcja</option>
+        <option value="biuro">Biuro</option>
+        <option value="readonly">Tylko odczyt</option>
+      </select>
+    </div>
+    <div class="modal-field hidden" id="mu-active-wrap">
+      <label>Status konta</label>
+      <select id="mu-active">
+        <option value="true">Aktywne</option>
+        <option value="false">Nieaktywne</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user')">Anuluj</button>
+      <button class="btn btn-primary" id="mu-save" onclick="saveUser()">Utwórz</button>
+    </div>
+    <div class="modal-err" id="mu-err"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     MODAL — Nowy element listy
+══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modal-cfg" onclick="closeMBg(event,'modal-cfg')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="mcfg-title">Dodaj element</div>
+    <div class="modal-field">
+      <label id="mcfg-label">Nazwa</label>
+      <input type="text" id="mcfg-val" autocomplete="off">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cfg')">Anuluj</button>
+      <button class="btn btn-primary" onclick="saveCfgItem()">Dodaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat mode — no build step needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            'AIzaSyB_aZ8Zi6jwJlKmcbtvmajaW1PkyYjw1o4',
+  authDomain:        'roltes-produkcja.firebaseapp.com',
+  projectId:         'roltes-produkcja',
+  storageBucket:     'roltes-produkcja.firebasestorage.app',
+  messagingSenderId: '61148153743',
+  appId:             '1:61148153743:web:d9bfd894e025be75fcadfa',
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const fns  = firebase.app().functions('europe-west1');
+
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const STATUS = {
+  nowe:                     { label: 'Nowe',                       color: '#ef4444', bg: '#fee2e2', border: '#fca5a5' },
+  w_produkcji:              { label: 'W produkcji',                color: '#334155', bg: '#e8eef4', border: '#94a3b8' },
+  oczekiwanie_na_materialy: { label: 'Oczekiwanie na materiały',   color: '#f97316', bg: '#ffedd5', border: '#fdba74' },
+  gotowe:                   { label: 'Gotowe',                     color: '#16a34a', bg: '#dcfce7', border: '#86efac' },
+  zrealizowane:             { label: 'Zrealizowane',               color: '#94a3b8', bg: '#f1f5f9', border: '#cbd5e1' },
+};
+
+const ROLES = {
+  administrator: { label: 'Administrator',  badge: 'badge-role-administrator' },
+  kierownik:     { label: 'Kierownik',      badge: 'badge-role-kierownik' },
+  produkcja:     { label: 'Produkcja',      badge: 'badge-role-produkcja' },
+  biuro:         { label: 'Biuro',          badge: 'badge-role-biuro' },
+  readonly:      { label: 'Tylko odczyt',   badge: 'badge-role-readonly' },
+};
+
+const ROLE_DESCRIPTIONS = {
+  administrator: 'Pełny dostęp do systemu: tworzenie, edycja i usuwanie zamówień oraz użytkowników. Dostęp do panelu administracyjnego, zarządzania listami i podglądu statusu Google Drive.',
+  kierownik:     'Pełny dostęp do zamówień: tworzenie, edycja numerów, dat, szczegółów, dodawanie i usuwanie zdjęć, zmiana statusu. Nie może zarządzać użytkownikami ani konfiguracją systemu.',
+  produkcja:     'Może tylko zmieniać status realizacji zamówień i dodawać komentarze (np. potrzebne materiały). Nie może zmieniać dat, numerów ani innych danych zamówienia.',
+  biuro:         'Może zmieniać daty zamówień (data zamówienia, planowana data montażu) oraz status realizacji. Może dodawać komentarze. Nie może edytować pozostałych pól.',
+  readonly:      'Dostęp wyłącznie do przeglądania zamówień i materiałów. Żadna edycja nie jest możliwa.',
+};
+
+const PERMS = {
+  createOrder:  ['administrator', 'kierownik'],
+  editNum:      ['administrator', 'kierownik'],
+  editDates:    ['administrator', 'kierownik', 'biuro'],
+  changeStatus: ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  editDetails:  ['administrator', 'kierownik'],
+  addComment:   ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  managePhotos: ['administrator', 'kierownik'],
+  deleteOrder:  ['administrator'],
+  manageUsers:  ['administrator'],
+  manageConfig: ['administrator'],
+  viewDrive:    ['administrator'],
+};
+
+const DEFAULT_CONFIG = {
+  kolory:   ['antracyt','orzech','wiśnia','mahoń','kość słoniowa','złoty dąb','zieleń','biały','szary','brąz','ciemny brąz','beż','winchester','srebrny','jasny szary'],
+  produkty: ['rolety zewnętrzne','bramy garażowe','rolety rzymskie','plisy','roletki','wertikale','żaluzje','żaluzje fasadowe','rolety screen','moskitiery'],
+};
+
+// ═══════════════════════════════════════════════════════════
+// IN-MEMORY CACHE  (renders are synchronous, reads hit cache)
+// ═══════════════════════════════════════════════════════════
+const cache = {
+  orders: [],
+  users:  [],
+  cfg:    { kolory: [...DEFAULT_CONFIG.kolory], produkty: [...DEFAULT_CONFIG.produkty] },
+  me:     null,   // { uid, username, displayName, role }
+};
+
+function getUser()   { return cache.me; }
+function can(action) {
+  const u = cache.me;
+  if (!u) return false;
+  return PERMS[action]?.includes(u.role) ?? false;
+}
+
+// ── Firebase data helpers ─────────────────────────────────
+async function loadAllData() {
+  showLoad();
+  try {
+    const [ordSnap, usrSnap, cfgSnap] = await Promise.all([
+      db.collection('orders').orderBy('createdAt', 'desc').get(),
+      db.collection('users').get(),
+      db.collection('config').doc('default').get(),
+    ]);
+    cache.orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.users  = usrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.cfg    = cfgSnap.exists ? cfgSnap.data() : { ...DEFAULT_CONFIG };
+  } finally {
+    hideLoad();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════
+async function doLogin() {
+  const un  = g('l-user').value.trim().toLowerCase();
+  const pw  = g('l-pass').value;
+  const btn = g('l-btn');
+  g('l-err').textContent = '';
+  if (!un || !pw) { g('l-err').textContent = 'Podaj login i hasło.'; return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await auth.signInWithEmailAndPassword(un + '@roltes.app', pw);
+    // onAuthStateChanged handles the rest
+  } catch(e) {
+    g('l-err').textContent = 'Błędny login lub hasło.';
+    g('l-user').classList.add('err');
+    btn.disabled = false;
+    btn.textContent = 'Zaloguj';
+  }
+}
+
+async function doLogout() {
+  try { await auth.signOut(); } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+let state = { screen:'login', params:{} };
+let prevScreen = null;
+
+function navigate(screen, params={}) {
+  prevScreen = state.screen !== screen ? state : prevScreen;
+  state = { screen, params };
+  render();
+}
+
+function goBack() {
+  if (state.screen === 'order') navigate('orders');
+  else navigate('dashboard');
+}
+
+function render() {
+  const main = g('main');
+  const hdr  = g('hdr');
+  const isLogin = state.screen === 'login';
+
+  hdr.classList.toggle('hidden', isLogin);
+  main.classList.toggle('no-hdr', isLogin);
+
+  const isRoot = ['dashboard','login'].includes(state.screen);
+  g('hdr-back').classList.toggle('vis', !isRoot);
+
+  const admin = cache.me?.role === 'administrator';
+  g('hdr-admin').style.display = (admin && state.screen !== 'admin') ? '' : 'none';
+
+  switch(state.screen) {
+    case 'login':     renderLogin(main);                        break;
+    case 'dashboard': renderDashboard(main);                    break;
+    case 'orders':    renderOrders(main);                       break;
+    case 'order':     renderOrderDetail(main, state.params.id); break;
+    case 'materials': renderMaterials(main);                    break;
+    case 'admin':     renderAdmin(main, state.params.tab||'users'); break;
+    default: navigate('dashboard');
+  }
+}
+
+function showApp() {
+  if (!cache.me) { navigate('login'); return; }
+  navigate('dashboard');
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: LOGIN
+// ═══════════════════════════════════════════════════════════
+function renderLogin(el) {
+  g('hdr').classList.add('hidden');
+  el.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-box">
+        <div class="login-logo">ROLTES</div>
+        <div class="login-sub">System zarządzania produkcją</div>
+        <input type="text"     id="l-user" placeholder="Login" autocomplete="username">
+        <input type="password" id="l-pass" placeholder="Hasło" autocomplete="current-password">
+        <button class="btn-login" id="l-btn" onclick="doLogin()">Zaloguj</button>
+        <div class="login-err" id="l-err"></div>
+      </div>
+    </div>`;
+  g('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function renderDashboard(el) {
+  g('hdr-title').textContent = 'ROLTES';
+  const u = cache.me;
+  const orders = cache.orders;
+  const matCount = orders.filter(o => o.statusRealizacji === 'oczekiwanie_na_materialy' && o.komentarz?.trim()).length;
+
+  el.innerHTML = `
+    <div class="page">
+      <div class="section-label" style="padding:0;margin-bottom:12px">
+        Witaj, ${esc(u.displayName)} <span style="opacity:.6;font-weight:400">(${ROLES[u.role]?.label})</span>
+      </div>
+      <div class="tile-grid">
+        ${can('manageUsers') ? `
+        <div class="tile" onclick="navigate('admin',{tab:'users'})">
+          <div class="tile-icon ic-purple">⚙️</div>
+          <div class="tile-name">Administracja</div>
+          <div class="tile-desc">Użytkownicy, konfiguracja i status dysku</div>
+        </div>` : ''}
+        <div class="tile" onclick="navigate('orders')">
+          <div class="tile-icon ic-blue">📋</div>
+          <div class="tile-name">Zamówienia</div>
+          <div class="tile-count">${orders.length}</div>
+          <div class="tile-desc">Wszystkie zamówienia, statusy i filtry</div>
+        </div>
+        <div class="tile" onclick="navigate('materials')">
+          <div class="tile-icon ic-orange">🔧</div>
+          <div class="tile-name">Potrzebne materiały</div>
+          <div class="tile-count" style="color:var(--oczek)">${matCount}</div>
+          <div class="tile-desc">Braki materiałowe z zamówień oczekujących</div>
+        </div>
+      </div>
+      <div class="section-label" style="margin-top:20px">Ostatnie aktywności</div>
+      ${renderRecentLog()}
+    </div>`;
+}
+
+function renderRecentLog() {
+  const all = cache.orders
+    .flatMap(o => (o.log||[]).map(l => ({...l, orderNum: o.numerZamowienia, orderId: o.id})))
+    .sort((a,b) => new Date(b.timestamp)-new Date(a.timestamp))
+    .slice(0,6);
+  if (!all.length) return '<div class="empty-state"><div class="empty-icon">📭</div><p class="empty-text">Brak aktywności</p></div>';
+  return `<div class="det-section" style="margin:0 12px">` +
+    all.map(l => `
+      <div class="det-field" style="padding:10px 14px">
+        <div style="font-size:.8rem">
+          <span class="log-who">${esc(l.displayName||l.username)}</span>
+          <span style="color:var(--muted)"> — ${esc(l.action)}</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--muted)">
+          Zam. <strong>${esc(l.orderNum)}</strong> · ${fmtDateTime(l.timestamp)}
+        </div>
+      </div>`).join('') + `</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: ORDERS LIST
+// ═══════════════════════════════════════════════════════════
+let filters = { status:[], zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:'date_desc' };
+
+function renderOrders(el) {
+  g('hdr-title').textContent = 'Zamówienia';
+  const cfg = cache.cfg;
+  const allRoutes = [...new Set(cache.orders.map(o=>o.numerTrasy).filter(Boolean))].sort();
+
+  el.innerHTML = `
+    <div class="list-toolbar">
+      ${can('createOrder') ? `<button class="btn-new" onclick="openNewOrder()">+ Nowe</button>` : ''}
+      <select class="filter-select" style="min-width:90px;max-width:130px"
+              onchange="filters.trasa=this.value;renderOrderList()">
+        <option value="">Wszystkie trasy</option>
+        ${allRoutes.map(r=>`<option value="${esc(r)}" ${filters.trasa===r?'selected':''}>${esc(r)}</option>`).join('')}
+      </select>
+      <select style="margin-left:auto;padding:7px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-size:.8rem;color:var(--muted);outline:none;cursor:pointer"
+              onchange="filters.sort=this.value;renderOrders(g('main'))">
+        <option value="date_desc" ${filters.sort==='date_desc'?'selected':''}>Najnowsze</option>
+        <option value="date_asc"  ${filters.sort==='date_asc' ?'selected':''}>Najstarsze</option>
+        <option value="plan_asc"  ${filters.sort==='plan_asc' ?'selected':''}>Planowana data ↑</option>
+        <option value="status"    ${filters.sort==='status'   ?'selected':''}>Wg statusu</option>
+      </select>
+    </div>
+
+    <div class="filter-panel" id="filter-panel">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px">Filtr statusu</div>
+      <div class="filter-row">
+        ${Object.entries(STATUS).map(([k,v])=>`
+          <div class="filter-chip${filters.status.includes(k)?' on':''}"
+               onclick="toggleStatusFilter('${k}')">${v.label}</div>`).join('')}
+      </div>
+      <div class="filter-row" style="margin-top:8px">
+        <input class="filter-input" type="text" placeholder="Szukaj zamawiającego..."
+               value="${esc(filters.zamawiajacy)}" oninput="filters.zamawiajacy=this.value;renderOrderList()">
+        <select class="filter-select" onchange="filters.produkt=this.value;renderOrderList()">
+          <option value="">Wszystkie produkty</option>
+          ${cfg.produkty.map(p=>`<option value="${esc(p)}" ${filters.produkt===p?'selected':''}>${esc(p)}</option>`).join('')}
+        </select>
+        <select class="filter-select" onchange="filters.kolor=this.value;renderOrderList()">
+          <option value="">Wszystkie kolory</option>
+          ${cfg.kolory.map(k=>`<option value="${esc(k)}" ${filters.kolor===k?'selected':''}>${esc(k)}</option>`).join('')}
+        </select>
+        <div class="filter-chip${filters.priorytet==='wazny'?' on':''}"
+             onclick="filters.priorytet=filters.priorytet==='wazny'?'':'wazny';renderOrderList()">⚑ Ważne</div>
+        <div class="filter-chip" onclick="clearFilters()" style="color:var(--nowe)">✕ Wyczyść</div>
+      </div>
+    </div>
+
+    <div id="order-list-wrap" class="order-list"></div>`;
+
+  renderOrderList();
+}
+
+function renderOrderList() {
+  const wrap = g('order-list-wrap');
+  if (!wrap) return;
+  let orders = cache.orders.slice();
+
+  if (filters.status.length)       orders = orders.filter(o => filters.status.includes(o.statusRealizacji));
+  if (filters.zamawiajacy)         orders = orders.filter(o => o.zamawiajacy?.toLowerCase().includes(filters.zamawiajacy.toLowerCase()));
+  if (filters.produkt)             orders = orders.filter(o => o.rodzajProduktu === filters.produkt);
+  if (filters.kolor)               orders = orders.filter(o => o.kolorMaterialu === filters.kolor);
+  if (filters.priorytet==='wazny') orders = orders.filter(o => o.priorytet === 'wazny');
+  if (filters.trasa)               orders = orders.filter(o => o.numerTrasy === filters.trasa);
+
+  const sortFns = {
+    date_desc: (a,b) => new Date(b.createdAt)-new Date(a.createdAt),
+    date_asc:  (a,b) => new Date(a.createdAt)-new Date(b.createdAt),
+    plan_asc:  (a,b) => (a.planowanaData||'9').localeCompare(b.planowanaData||'9'),
+    status:    (a,b) => Object.keys(STATUS).indexOf(a.statusRealizacji)-Object.keys(STATUS).indexOf(b.statusRealizacji),
+  };
+  orders.sort(sortFns[filters.sort] || sortFns.date_desc);
+
+  if (!orders.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p class="empty-text">Brak zamówień spełniających kryteria</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = orders.map(o => {
+    const sc      = STATUS[o.statusRealizacji] ?? STATUS.nowe;
+    const wazny   = o.priorytet === 'wazny';
+    const isZreal = o.statusRealizacji === 'zrealizowane';
+    const isProd  = o.statusRealizacji === 'w_produkcji';
+    const bg      = wazny ? '#dbeafe' : sc.bg;
+    const bord    = wazny ? '#93c5fd' : sc.border;
+    const grey    = isZreal ? 'color:#c0cdd8' : '';
+    const cardFW  = isProd  ? 'font-weight:700' : '';
+    return `<div class="order-card" onclick="navigate('order',{id:'${o.id}'})"
+                 style="background:${bg};border-color:${bord};${cardFW}">
+      <div class="order-card-top">
+        <span class="order-num" style="${grey}">${esc(o.numerZamowienia)}</span>
+        ${wazny ? `<span class="badge badge-wazny">⚑ Ważny</span>` : ''}
+        <span class="badge" style="background:${sc.color};margin-left:auto">${sc.label}</span>
+      </div>
+      <div class="order-card-mid">
+        <div class="order-client" style="${grey}">${esc(o.zamawiajacy)}</div>
+        <div class="order-product" style="${grey}">${esc(o.rodzajProduktu)}${o.kolorMaterialu?' · '+esc(o.kolorMaterialu):''}</div>
+      </div>
+      <div class="order-card-bot" style="${grey}">
+        <span>${o.planowanaData?'📅 '+fmtDate(o.planowanaData):'Bez terminu'}</span>
+        ${o.numerTrasy?`<span>Trasa: ${esc(o.numerTrasy)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleStatusFilter(s) {
+  const i = filters.status.indexOf(s);
+  if (i===-1) filters.status.push(s); else filters.status.splice(i,1);
+  renderOrders(g('main'));
+}
+
+function clearFilters() {
+  filters = { status:[], zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:filters.sort };
+  renderOrders(g('main'));
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: ORDER DETAIL
+// ═══════════════════════════════════════════════════════════
+function renderOrderDetail(el, id) {
+  const order = cache.orders.find(o => o.id === id);
+  if (!order) { toast('Nie znaleziono zamówienia'); navigate('orders'); return; }
+
+  g('hdr-title').innerHTML = `Zamówienie <small>${esc(order.numerZamowienia)}</small>`;
+
+  const ro_num   = !can('editNum');
+  const ro_dates = !can('editDates');
+  const ro_det   = !can('editDetails');
+  const ro_stat  = !can('changeStatus');
+  const ro_com   = !can('addComment');
+  const sc       = STATUS[order.statusRealizacji] ?? STATUS.nowe;
+  const wazny    = order.priorytet === 'wazny';
+  const stripeColor = wazny ? '#2563eb' : sc.color;
+  const cfg = cache.cfg;
+
+  el.innerHTML = `
+    <div class="page">
+      <div style="background:${stripeColor};color:#fff;padding:10px 14px;border-radius:var(--radius);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="font-weight:700;font-size:.95rem">${sc.label}</span>
+        ${wazny?'<span style="opacity:.85;font-size:.82rem">⚑ Ważny priorytet</span>':''}
+      </div>
+
+      ${!ro_stat ? `
+      <div class="det-section">
+        <div class="det-section-title">Zmień status</div>
+        <div style="padding:12px 16px">
+          <div class="status-row">
+            ${Object.entries(STATUS).map(([k,v])=>`
+              <button class="status-btn${order.statusRealizacji===k?' active':''}"
+                      style="${order.statusRealizacji===k?'background:'+v.color:''}"
+                      onclick="setStatus('${id}','${k}')">${v.label}</button>`).join('')}
+          </div>
+        </div>
+      </div>` : ''}
+
+      <div class="det-section">
+        <div class="det-section-title">Dane zamówienia</div>
+        <div class="det-field">
+          <label>Numer zamówienia</label>
+          <input id="d-num" type="text" value="${esc(order.numerZamowienia)}" ${ro_num?'readonly':''}>
+        </div>
+        <div class="det-field">
+          <label>Zamawiający</label>
+          <input id="d-client" type="text" value="${esc(order.zamawiajacy)}" ${ro_det?'readonly':''}>
+        </div>
+        <div class="det-field">
+          <label>Data zamówienia</label>
+          <input id="d-date" type="date" value="${order.dataZamowienia||''}" ${ro_dates?'readonly':''}>
+        </div>
+        <div class="det-field">
+          <label>Planowana data montażu/wysyłki</label>
+          <input id="d-planned" type="date" value="${order.planowanaData||''}" ${ro_dates?'readonly':''}>
+        </div>
+        <div class="det-field">
+          <label>Numer trasy</label>
+          <input id="d-route" type="text" value="${esc(order.numerTrasy||'')}" ${ro_det?'readonly':''}>
+        </div>
+      </div>
+
+      <div class="det-section">
+        <div class="det-section-title">Produkt</div>
+        <div class="det-field">
+          <label>Rodzaj produktu</label>
+          ${ro_det
+            ? `<div class="field-val">${esc(order.rodzajProduktu||'—')}</div>`
+            : `<select id="d-product">${cfg.produkty.map(p=>`<option ${order.rodzajProduktu===p?'selected':''}>${esc(p)}</option>`).join('')}</select>`}
+        </div>
+        <div class="det-field">
+          <label>Kolor materiału</label>
+          ${ro_det
+            ? `<div class="field-val">${esc(order.kolorMaterialu||'—')}</div>`
+            : `<select id="d-color">${cfg.kolory.map(k=>`<option ${order.kolorMaterialu===k?'selected':''}>${esc(k)}</option>`).join('')}</select>`}
+        </div>
+        <div class="det-field">
+          <label>Priorytet</label>
+          ${ro_det
+            ? `<div class="field-val">${order.priorytet==='wazny'?'⚑ Ważny':'Normalny'}</div>`
+            : `<select id="d-prio"><option value="normalny" ${order.priorytet!=='wazny'?'selected':''}>Normalny</option><option value="wazny" ${order.priorytet==='wazny'?'selected':''}>⚑ Ważny</option></select>`}
+        </div>
+      </div>
+
+      <div class="det-section">
+        <div class="det-section-title">Komentarz / Potrzebne materiały</div>
+        <div class="det-field">
+          <textarea id="d-comment" ${ro_com?'readonly':''}
+                    placeholder="${ro_com?'Brak uprawnień do dodawania komentarzy':'Wpisz komentarz lub potrzebne materiały...'}"
+          >${esc(order.komentarz||'')}</textarea>
+        </div>
+      </div>
+
+      ${(can('editNum')||can('editDates')||can('editDetails')||can('addComment')) ? `
+      <button class="btn btn-primary" onclick="saveOrder('${id}')">Zapisz zmiany</button>
+      ` : ''}
+
+      <div class="det-section mt8">
+        <div class="det-section-title">Zdjęcia (${(order.zdjecia||[]).length})</div>
+        <div class="photo-grid" id="photo-grid-${id}">
+          ${(order.zdjecia||[]).map(z => {
+            const thumb = `https://drive.google.com/thumbnail?id=${z.id}&sz=w400`;
+            const full  = `https://drive.google.com/thumbnail?id=${z.id}&sz=w1600`;
+            return `<div class="photo-thumb" data-zid="${z.id}">
+              <img src="${thumb}" onclick="openImg('${full}')" alt="${esc(z.name)}" loading="lazy">
+              ${can('managePhotos')?`<button class="photo-del" onclick="deletePhoto('${id}','${z.id}')">✕</button>`:''}
+            </div>`;
+          }).join('')}
+          ${can('managePhotos')?`
+            <div class="photo-add" onclick="g('photo-in-${id}').click()">
+              <span class="photo-add-icon">📷</span>Dodaj
+            </div>
+            <input type="file" id="photo-in-${id}" class="file-input-hidden" accept="image/*" multiple
+                   onchange="uploadPhotos('${id}',this)">`:''}
+        </div>
+        ${!can('managePhotos')?`<div style="padding:0 16px 12px;font-size:.75rem;color:var(--muted)">
+          Zarządzanie zdjęciami wymaga uprawnień kierownika lub administratora.</div>`:''}
+      </div>
+
+      ${can('deleteOrder') ? `
+      <button class="btn btn-danger mt8" onclick="deleteOrder('${id}')">Usuń zamówienie</button>
+      ` : ''}
+
+      <div class="det-section mt8">
+        <div class="det-section-title">Historia zmian</div>
+        <div class="log-list">
+          ${[...(order.log||[])].reverse().map(l=>`
+            <div class="log-item">
+              <span class="log-who">${esc(l.displayName||l.username)}</span>
+              — ${esc(l.action)}
+              <div class="log-time">${fmtDateTime(l.timestamp)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: MATERIALS
+// ═══════════════════════════════════════════════════════════
+function renderMaterials(el) {
+  g('hdr-title').textContent = 'Potrzebne materiały';
+  const orders = cache.orders.filter(o =>
+    o.statusRealizacji === 'oczekiwanie_na_materialy' && o.komentarz?.trim()
+  );
+
+  if (!orders.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <p class="empty-text">Brak zamówień oczekujących na materiały</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="page">
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:12px">
+      ${orders.length} zamówień oczekuje na materiały. Kliknij grupę, aby przejść do zamówienia.
+    </div>
+    ${orders.map(o=>`
+      <div class="mat-group" onclick="navigate('order',{id:'${o.id}'})">
+        <div class="mat-head">
+          <div>
+            <div class="mat-order-num">${esc(o.numerZamowienia)}</div>
+            <div class="mat-client">${esc(o.zamawiajacy)} · ${esc(o.rodzajProduktu)||''}</div>
+          </div>
+          ${o.priorytet==='wazny'?'<span class="badge badge-wazny" style="margin-left:auto">⚑ Ważny</span>':''}
+        </div>
+        <div class="mat-body">${esc(o.komentarz)}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: ADMIN
+// ═══════════════════════════════════════════════════════════
+function renderAdmin(el, tab='users') {
+  g('hdr-title').textContent = 'Administracja';
+  el.innerHTML = `<div class="page">
+    <div class="admin-tabs">
+      <button class="admin-tab${tab==='users'?' active':''}" onclick="navigate('admin',{tab:'users'})">Użytkownicy</button>
+      <button class="admin-tab${tab==='config'?' active':''}" onclick="navigate('admin',{tab:'config'})">Konfiguracja list</button>
+      <button class="admin-tab${tab==='drive'?' active':''}" onclick="navigate('admin',{tab:'drive'})">Google Drive</button>
+      <button class="admin-tab${tab==='roles'?' active':''}" onclick="navigate('admin',{tab:'roles'})">Role</button>
+    </div>
+    <div id="admin-content"></div>
+  </div>`;
+
+  const ac = g('admin-content');
+  if (tab==='users')  renderAdminUsers(ac);
+  if (tab==='config') renderAdminConfig(ac);
+  if (tab==='drive')  renderAdminDrive(ac);
+  if (tab==='roles')  renderAdminRoles(ac);
+}
+
+function renderAdminUsers(el) {
+  const users = cache.users;
+  el.innerHTML = `
+    <button class="btn btn-primary btn-sm" style="width:auto;margin-bottom:12px" onclick="openNewUser()">+ Dodaj użytkownika</button>
+    ${users.map(u=>`
+      <div class="user-card">
+        <div class="user-avatar">${esc((u.displayName||u.username||'?').slice(0,2).toUpperCase())}</div>
+        <div class="user-info">
+          <div class="user-name">${esc(u.displayName)}</div>
+          <div class="user-uname">@${esc(u.username || u.email?.split('@')[0] || u.id)}</div>
+        </div>
+        <span class="badge ${ROLES[u.role]?.badge||''}">${ROLES[u.role]?.label||u.role}</span>
+        ${u.active===false?'<span class="badge badge-inactive" style="margin-left:4px">Nieaktywny</span>':''}
+        <button class="hdr-btn" style="color:var(--muted);background:none;border:none;cursor:pointer;font-size:1rem" onclick="openEditUser('${u.id}')">⚙</button>
+      </div>`).join('')}`;
+}
+
+function renderAdminConfig(el) {
+  const cfg = cache.cfg;
+  el.innerHTML = `
+    <div class="section-label" style="padding:0;margin-bottom:6px">Kolory materiałów</div>
+    <div class="config-list">
+      ${cfg.kolory.map((k,i)=>`
+        <div class="config-item">
+          <span class="config-item-label">${esc(k)}</span>
+          <button class="btn-cfg-del" onclick="deleteCfgItem('kolory',${i})">✕</button>
+        </div>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-sm mt8" style="width:auto" onclick="openAddCfg('kolory','Nowy kolor','Nazwa koloru')">+ Dodaj kolor</button>
+
+    <div class="section-label" style="padding:0;margin-top:16px;margin-bottom:6px">Rodzaje produktów</div>
+    <div class="config-list">
+      ${cfg.produkty.map((p,i)=>`
+        <div class="config-item">
+          <span class="config-item-label">${esc(p)}</span>
+          <button class="btn-cfg-del" onclick="deleteCfgItem('produkty',${i})">✕</button>
+        </div>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-sm mt8" style="width:auto" onclick="openAddCfg('produkty','Nowy produkt','Nazwa produktu')">+ Dodaj produkt</button>`;
+}
+
+function renderAdminDrive(el) {
+  el.innerHTML = `<div class="drive-card"><div class="drive-label">Ładowanie danych dysku...</div>
+    <div class="drive-bar-wrap"><div class="drive-bar" style="width:0%"></div></div></div>`;
+
+  fns.httpsCallable('getDriveStorage')({})
+    .then(result => {
+      const { limit, usage, folderId } = result.data;
+      const usedGB  = (parseInt(usage)  / 1e9).toFixed(2);
+      const totalGB = (parseInt(limit)  / 1e9).toFixed(1);
+      const pct     = Math.min(100, Math.round(parseInt(usage) / parseInt(limit) * 100));
+      const barCls  = pct > 85 ? 'danger' : pct > 65 ? 'warn' : '';
+      const folderUrl = folderId ? `https://drive.google.com/drive/folders/${folderId}` : '#';
+      el.innerHTML = `
+        <div class="drive-card">
+          <div class="drive-label">Google Drive — zajętość konta Roltes</div>
+          <div class="drive-bar-wrap"><div class="drive-bar ${barCls}" style="width:${pct}%"></div></div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:8px">
+            ${usedGB} GB / ${totalGB} GB (${pct}%)
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);font-size:.85rem;line-height:1.6">
+          <a href="${folderUrl}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">
+            📁 Otwórz folder zdjęć na Dysku Google ↗
+          </a><br>
+          <span style="font-size:.78rem;color:var(--muted)">Każde zamówienie ma swój podfolder z plikami zdjęć.</span>
+        </div>`;
+    })
+    .catch(e => {
+      el.innerHTML = `<div class="drive-card">
+        <div class="drive-label" style="color:var(--nowe)">Błąd połączenia z Drive: ${esc(e.message||'Nieznany błąd')}</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:6px">Sprawdź czy Cloud Functions są wdrożone i skonfigurowane.</div>
+      </div>`;
+    });
+}
+
+function renderAdminRoles(el) {
+  el.innerHTML = Object.entries(ROLES).map(([key, r])=>`
+    <div class="role-desc-card" style="border-left-color:var(--${key==='administrator'?'accent':'muted'})">
+      <div class="role-desc-name">${r.label}</div>
+      <div class="role-desc-text">${esc(ROLE_DESCRIPTIONS[key])}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CRUD — ORDERS
+// ═══════════════════════════════════════════════════════════
+let pendingPhotos = [];
+
+function openNewOrder() {
+  const cfg = cache.cfg;
+  g('mo-product').innerHTML = cfg.produkty.map(p=>`<option>${esc(p)}</option>`).join('');
+  g('mo-color').innerHTML   = cfg.kolory.map(k=>`<option>${esc(k)}</option>`).join('');
+  g('mo-date').value        = new Date().toISOString().slice(0,10);
+  g('mo-num').value = g('mo-client').value = g('mo-planned').value = g('mo-route').value = '';
+  g('mo-priority').value = 'normalny';
+  g('mo-err').textContent = '';
+  g('mo-save').disabled   = false;
+  g('mo-save').textContent = 'Utwórz';
+  g('mo-title').textContent = 'Nowe zamówienie';
+  pendingPhotos = [];
+  openModal('modal-order');
+  renderMoPhotoGrid();
+}
+
+async function createOrder() {
+  const num    = g('mo-num').value.trim();
+  const client = g('mo-client').value.trim();
+  if (!num || !client) { g('mo-err').textContent = 'Wypełnij numer i zamawiającego.'; return; }
+
+  const btn = g('mo-save');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const u  = cache.me;
+  const id = 'ord-' + Math.random().toString(36).slice(2,10);
+  const order = {
+    id,
+    numerZamowienia: num,
+    dataZamowienia:  g('mo-date').value || new Date().toISOString().slice(0,10),
+    zamawiajacy:     client,
+    statusRealizacji:'nowe',
+    planowanaData:   g('mo-planned').value || '',
+    numerTrasy:      g('mo-route').value.trim(),
+    kolorMaterialu:  g('mo-color').value,
+    rodzajProduktu:  g('mo-product').value,
+    priorytet:       g('mo-priority').value,
+    komentarz:       '',
+    zdjecia:         [],
+    log:             [{ timestamp:nowISO(), username:u.username, displayName:u.displayName,
+                        action:'Utworzenie zamówienia' }],
+    createdAt:       nowISO(),
+  };
+
+  try {
+    await db.collection('orders').doc(id).set(order);
+    cache.orders.unshift(order);
+
+    if (pendingPhotos.length > 0) {
+      showLoad();
+      for (const ph of pendingPhotos) {
+        try {
+          const base64 = ph.data.replace(/^data:[^;]+;base64,/, '');
+          const mime   = ph.data.match(/^data:([^;]+);/)?.[1] || 'image/jpeg';
+          const res    = await fns.httpsCallable('uploadPhoto')({
+            budowaId: id, numerZamowienia: num,
+            fileBase64: base64, fileName: ph.name, mimeType: mime,
+          });
+          const z = { id: res.data.id, name: res.data.name, viewLink: res.data.viewLink };
+          order.zdjecia.push(z);
+          order.log.push({ timestamp: nowISO(), username: u.username, displayName: u.displayName,
+                           action: 'Dodanie zdjęcia: ' + ph.name });
+          await db.collection('orders').doc(id).update({ zdjecia: order.zdjecia, log: order.log });
+        } catch(e) { toast('Błąd uploadu: ' + ph.name); }
+      }
+      hideLoad();
+    }
+
+    pendingPhotos = [];
+    closeModal('modal-order');
+    toast('Zamówienie utworzone');
+    navigate('order', { id });
+  } catch(e) {
+    g('mo-err').textContent = 'Błąd: ' + (e.message || e);
+    btn.disabled = false;
+    btn.textContent = 'Utwórz';
+  }
+}
+
+async function handleMoPhotos(input) {
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+  showLoad();
+  for (const file of files) {
+    try {
+      const data = await compressImg(file);
+      pendingPhotos.push({ id:'z'+Math.random().toString(36).slice(2,10), name:file.name, data });
+    } catch(e) { toast('Błąd: '+file.name); }
+  }
+  hideLoad();
+  renderMoPhotoGrid();
+}
+
+function renderMoPhotoGrid() {
+  const grid = g('mo-photo-grid');
+  if (!grid) return;
+  grid.innerHTML = pendingPhotos.map(z=>`
+    <div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--border)">
+      <img src="${z.data}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="pendingPhotos=pendingPhotos.filter(p=>p.id!=='${z.id}');renderMoPhotoGrid()"
+              style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`).join('');
+}
+
+async function saveOrder(id) {
+  const idx = cache.orders.findIndex(o => o.id === id);
+  if (idx === -1) return;
+  const o   = cache.orders[idx];
+  const u   = cache.me;
+  const changes = [];
+
+  if (can('editNum')) {
+    const nv = g('d-num')?.value?.trim();
+    if (nv && nv !== o.numerZamowienia) { changes.push('Zmiana nr zamówienia na: '+nv); o.numerZamowienia = nv; }
+  }
+  if (can('editDates')) {
+    const dd = g('d-date')?.value;
+    const dp = g('d-planned')?.value;
+    if (dd && dd !== o.dataZamowienia) { changes.push('Zmiana daty zamówienia'); o.dataZamowienia = dd; }
+    if (dp !== undefined && dp !== o.planowanaData) { changes.push('Zmiana planowanej daty'); o.planowanaData = dp; }
+  }
+  if (can('editDetails')) {
+    const cl = g('d-client')?.value?.trim();
+    const rt = g('d-route')?.value?.trim();
+    const pr = g('d-product')?.value;
+    const co = g('d-color')?.value;
+    const pi = g('d-prio')?.value;
+    if (cl && cl !== o.zamawiajacy)    { changes.push('Zmiana zamawiającego'); o.zamawiajacy = cl; }
+    if (rt !== undefined && rt !== o.numerTrasy)  { o.numerTrasy = rt; }
+    if (pr && pr !== o.rodzajProduktu) { changes.push('Zmiana produktu na: '+pr); o.rodzajProduktu = pr; }
+    if (co && co !== o.kolorMaterialu) { changes.push('Zmiana koloru na: '+co); o.kolorMaterialu = co; }
+    if (pi && pi !== o.priorytet)      { changes.push('Zmiana priorytetu na: '+(pi==='wazny'?'Ważny':'Normalny')); o.priorytet = pi; }
+  }
+  if (can('addComment')) {
+    const cm = g('d-comment')?.value;
+    if (cm !== undefined && cm !== o.komentarz) { changes.push('Aktualizacja komentarza'); o.komentarz = cm; }
+  }
+
+  if (changes.length) {
+    o.log = [...(o.log||[]), { timestamp:nowISO(), username:u.username, displayName:u.displayName, action:changes.join('; ') }];
+  }
+
+  showLoad();
+  try {
+    await db.collection('orders').doc(id).set(o);
+    toast('Zapisano');
+    renderOrderDetail(g('main'), id);
+  } catch(e) {
+    toast('Błąd zapisu: ' + (e.message || e));
+  } finally {
+    hideLoad();
+  }
+}
+
+async function setStatus(id, newStatus) {
+  const idx = cache.orders.findIndex(o => o.id === id);
+  if (idx === -1) return;
+  const u = cache.me;
+  const logEntry = { timestamp:nowISO(), username:u.username, displayName:u.displayName,
+                     action:'Zmiana statusu na: ' + STATUS[newStatus].label };
+  cache.orders[idx].statusRealizacji = newStatus;
+  cache.orders[idx].log = [...(cache.orders[idx].log||[]), logEntry];
+  try {
+    await db.collection('orders').doc(id).update({
+      statusRealizacji: newStatus,
+      log: cache.orders[idx].log,
+    });
+    toast('Status zmieniony');
+    renderOrderDetail(g('main'), id);
+  } catch(e) {
+    toast('Błąd: ' + (e.message || e));
+  }
+}
+
+function deleteOrder(id) {
+  confirm2('Usuń zamówienie', 'Tej operacji nie można cofnąć. Wszystkie dane i zdjęcia zamówienia zostaną trwale usunięte.', 'Usuń', async () => {
+    showLoad();
+    try {
+      const order = cache.orders.find(o => o.id === id);
+      if (order?.driveFolderId) {
+        try { await fns.httpsCallable('deleteDriveFolder')({ folderId: order.driveFolderId }); } catch(e) {}
+      }
+      await db.collection('orders').doc(id).delete();
+      cache.orders = cache.orders.filter(o => o.id !== id);
+      toast('Zamówienie usunięte');
+      navigate('orders');
+    } catch(e) {
+      toast('Błąd usuwania: ' + (e.message || e));
+    } finally {
+      hideLoad();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHOTOS — upload/delete via Google Drive Cloud Function
+// ═══════════════════════════════════════════════════════════
+async function uploadPhotos(orderId, input) {
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+
+  const order = cache.orders.find(o => o.id === orderId);
+  if (!order) return;
+  const u = cache.me;
+
+  showLoad();
+  for (const file of files) {
+    try {
+      const data   = await compressImg(file);
+      const base64 = data.replace(/^data:[^;]+;base64,/, '');
+      const mime   = data.match(/^data:([^;]+);/)?.[1] || 'image/jpeg';
+      const res    = await fns.httpsCallable('uploadPhoto')({
+        budowaId: orderId, numerZamowienia: order.numerZamowienia,
+        fileBase64: base64, fileName: file.name, mimeType: mime,
+      });
+      const z = { id: res.data.id, name: res.data.name, viewLink: res.data.viewLink };
+      order.zdjecia = [...(order.zdjecia||[]), z];
+      order.log = [...(order.log||[]), {
+        timestamp: nowISO(), username: u.username, displayName: u.displayName,
+        action: 'Dodanie zdjęcia: ' + file.name,
+      }];
+      await db.collection('orders').doc(orderId).update({ zdjecia: order.zdjecia, log: order.log });
+    } catch(e) { console.error(e); toast('Błąd uploadu: ' + file.name); }
+  }
+  hideLoad();
+  renderOrderDetail(g('main'), orderId);
+}
+
+function deletePhoto(orderId, zid) {
+  confirm2('Usuń zdjęcie', 'Zdjęcie zostanie trwale usunięte z Google Drive.', 'Usuń', async () => {
+    const order = cache.orders.find(o => o.id === orderId);
+    if (!order) return;
+    const z = (order.zdjecia||[]).find(z=>z.id===zid);
+    const u = cache.me;
+    showLoad();
+    try {
+      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id });
+      order.zdjecia = (order.zdjecia||[]).filter(z=>z.id!==zid);
+      order.log = [...(order.log||[]), {
+        timestamp: nowISO(), username: u.username, displayName: u.displayName,
+        action: 'Usunięcie zdjęcia' + (z ? ': '+z.name : ''),
+      }];
+      await db.collection('orders').doc(orderId).update({ zdjecia: order.zdjecia, log: order.log });
+      renderOrderDetail(g('main'), orderId);
+    } catch(e) { toast('Błąd usuwania: ' + (e.message || e)); }
+    finally { hideLoad(); }
+  });
+}
+
+function compressImg(file, maxW=800, q=0.65) {
+  return new Promise((res,rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const r = Math.min(maxW/img.width, 1);
+      const c = document.createElement('canvas');
+      c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = rej;
+    img.src = url;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CRUD — USERS  (via Cloud Functions — admin SDK required)
+// ═══════════════════════════════════════════════════════════
+let editingUserId = null;
+
+function openNewUser() {
+  editingUserId = null;
+  g('mu-title').textContent = 'Nowy użytkownik';
+  g('mu-name').value = g('mu-uname').value = g('mu-pass').value = '';
+  g('mu-role').value = 'produkcja';
+  g('mu-uname-wrap').classList.remove('hidden');
+  g('mu-pass-wrap').classList.remove('hidden');
+  g('mu-active-wrap').classList.add('hidden');
+  g('mu-err').textContent = '';
+  g('mu-save').disabled = false;
+  g('mu-save').textContent = 'Utwórz';
+  openModal('modal-user');
+}
+
+function openEditUser(uid) {
+  const u = cache.users.find(u=>u.id===uid);
+  if (!u) return;
+  editingUserId = uid;
+  g('mu-title').textContent = 'Edytuj użytkownika';
+  g('mu-name').value   = u.displayName;
+  g('mu-uname').value  = u.username || u.email?.split('@')[0] || '';
+  g('mu-role').value   = u.role;
+  g('mu-active').value = u.active!==false?'true':'false';
+  g('mu-pass').value   = '';
+  g('mu-uname-wrap').classList.add('hidden');
+  g('mu-pass-wrap').classList.remove('hidden');
+  g('mu-active-wrap').classList.remove('hidden');
+  g('mu-err').textContent = '';
+  g('mu-save').disabled = false;
+  g('mu-save').textContent = 'Zapisz';
+  openModal('modal-user');
+}
+
+async function saveUser() {
+  const name  = g('mu-name').value.trim();
+  const uname = g('mu-uname').value.trim().toLowerCase();
+  const pass  = g('mu-pass').value;
+  const role  = g('mu-role').value;
+  const err   = g('mu-err');
+  const btn   = g('mu-save');
+
+  if (!name) { err.textContent='Podaj imię i nazwisko.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    if (editingUserId) {
+      const active = g('mu-active').value === 'true';
+      const payload = { uid: editingUserId, displayName: name, role, active };
+      if (pass.length >= 8) payload.password = pass;
+      await fns.httpsCallable('updateUser')(payload);
+      const idx = cache.users.findIndex(u=>u.id===editingUserId);
+      if (idx >= 0) Object.assign(cache.users[idx], { displayName: name, role, active });
+      closeModal('modal-user');
+      toast('Użytkownik zaktualizowany');
+      renderAdmin(g('main'), 'users');
+    } else {
+      if (!uname)       { err.textContent='Podaj login.'; btn.disabled=false; btn.textContent='Utwórz'; return; }
+      if (pass.length<8){ err.textContent='Hasło min. 8 znaków.'; btn.disabled=false; btn.textContent='Utwórz'; return; }
+      if (cache.users.find(u=>(u.username||u.email?.split('@')[0])===uname)) {
+        err.textContent='Login już istnieje.'; btn.disabled=false; btn.textContent='Utwórz'; return;
+      }
+      const res = await fns.httpsCallable('createUser')({
+        email: uname + '@roltes.app',
+        username: uname,
+        password: pass,
+        displayName: name,
+        role,
+      });
+      cache.users.push({ id: res.data.uid, username: uname, displayName: name, role, active: true });
+      closeModal('modal-user');
+      toast('Użytkownik utworzony');
+      renderAdmin(g('main'), 'users');
+    }
+  } catch(e) {
+    err.textContent = 'Błąd: ' + (e.message || JSON.stringify(e));
+    btn.disabled = false;
+    btn.textContent = editingUserId ? 'Zapisz' : 'Utwórz';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CRUD — CONFIG
+// ═══════════════════════════════════════════════════════════
+let cfgEditKey = null;
+
+function openAddCfg(key, title, label) {
+  cfgEditKey = key;
+  g('mcfg-title').textContent = title;
+  g('mcfg-label').textContent = label;
+  g('mcfg-val').value = '';
+  openModal('modal-cfg');
+}
+
+async function saveCfgItem() {
+  const val = g('mcfg-val').value.trim();
+  if (!val) return;
+  if (!cache.cfg[cfgEditKey].includes(val)) {
+    cache.cfg[cfgEditKey].push(val);
+    try { await db.collection('config').doc('default').set(cache.cfg); } catch(e) { toast('Błąd zapisu konfiguracji'); }
+  }
+  closeModal('modal-cfg');
+  renderAdmin(g('main'), 'config');
+}
+
+async function deleteCfgItem(key, idx) {
+  cache.cfg[key].splice(idx, 1);
+  try { await db.collection('config').doc('default').set(cache.cfg); } catch(e) { toast('Błąd zapisu konfiguracji'); }
+  renderAdmin(g('main'), 'config');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════════════════
+function openModal(id) { g(id).classList.add('open'); }
+function closeModal(id){ g(id).classList.remove('open'); }
+function closeMBg(e,id){ if(e.target===g(id)) closeModal(id); }
+
+let confirmCb = null;
+function confirm2(title, text, okLabel, cb) {
+  g('confirm-title').textContent = title;
+  g('confirm-text').textContent  = text;
+  g('confirm-ok').textContent    = okLabel;
+  confirmCb = cb;
+  g('confirm-modal').classList.add('open');
+}
+function confirmResolve(yes) {
+  g('confirm-modal').classList.remove('open');
+  if (yes && confirmCb) {
+    const p = confirmCb();
+    if (p && p.catch) p.catch(e => toast('Błąd: ' + (e.message || e)));
+  }
+  confirmCb = null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMAGE VIEWER
+// ═══════════════════════════════════════════════════════════
+function openImg(src) { g('img-full').src=src; g('img-fs').classList.remove('hidden'); }
+function closeImg()   { g('img-fs').classList.add('hidden'); g('img-full').src=''; }
+
+// ═══════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════
+function g(id) { return document.getElementById(id); }
+function esc(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function nowISO() { return new Date().toISOString(); }
+function fmtDate(s)     { if(!s) return '—'; try { return new Date(s+'T00:00:00').toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return s; } }
+function fmtDateTime(s) { if(!s) return '—'; try { return new Date(s).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch { return s; } }
+
+let toastTmr;
+function toast(msg, dur=2600) {
+  const el=g('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTmr); toastTmr=setTimeout(()=>el.classList.remove('show'),dur);
+}
+function showLoad(){ g('loading').classList.remove('hidden'); }
+function hideLoad(){ g('loading').classList.add('hidden'); }
+
+// ═══════════════════════════════════════════════════════════
+// INIT — Firebase auth state drives everything
+// ═══════════════════════════════════════════════════════════
+auth.onAuthStateChanged(async fbUser => {
+  if (!fbUser) {
+    cache.me = null;
+    hideLoad();
+    navigate('login');
+    return;
+  }
+  try {
+    const snap = await db.collection('users').doc(fbUser.uid).get();
+    if (!snap.exists || snap.data().active === false) {
+      await auth.signOut();
+      return;
+    }
+    const ud = snap.data();
+    cache.me = {
+      uid:         fbUser.uid,
+      username:    ud.username || ud.email?.split('@')[0] || '',
+      displayName: ud.displayName || fbUser.displayName || '',
+      role:        ud.role,
+    };
+    await loadAllData();
+    showApp();
+  } catch(e) {
+    console.error('Init error:', e);
+    hideLoad();
+    navigate('login');
+  }
+});
+</script>
+</body>
+</html>
