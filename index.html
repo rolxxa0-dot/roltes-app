@@ -838,7 +838,29 @@ async function doLogin() {
   }
 }
 
+// ── Presence (online status) ──────────────────────────────
+let _heartbeat = null;
+
+function presenceSet(online) {
+  const uid = cache.me?.uid;
+  if (!uid) return;
+  db.collection('users').doc(uid).update({ online, lastSeen: new Date().toISOString() }).catch(()=>{});
+}
+
+function presenceStart() {
+  presenceSet(true);
+  _heartbeat = setInterval(() => presenceSet(true), 60_000);
+  window.addEventListener('beforeunload', presenceStop);
+}
+
+function presenceStop() {
+  clearInterval(_heartbeat);
+  _heartbeat = null;
+  presenceSet(false);
+}
+
 async function doLogout() {
+  presenceStop();
   try { await auth.signOut(); } catch(e) {}
 }
 
@@ -1284,22 +1306,36 @@ function renderAdmin(el, tab='users') {
   if (tab==='roles')  renderAdminRoles(ac);
 }
 
+function isOnline(u) {
+  if (!u.online || !u.lastSeen) return false;
+  return (Date.now() - new Date(u.lastSeen).getTime()) < 2 * 60 * 1000;
+}
+
 function renderAdminUsers(el) {
   const users = cache.users;
+  const online = users.filter(u => u.active !== false && isOnline(u));
   el.innerHTML = `
     <button class="btn btn-primary btn-sm" style="width:auto;margin-bottom:12px" onclick="openNewUser()">+ Dodaj użytkownika</button>
-    ${users.map(u=>`
+    ${online.length ? `<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">
+      Zalogowani teraz (${online.length})</div>` : ''}
+    ${users.map(u => {
+      const online = isOnline(u);
+      return `
       <div class="user-card">
-        <div class="user-avatar">${esc((u.displayName||u.username||'?').slice(0,2).toUpperCase())}</div>
+        <div style="position:relative;flex-shrink:0">
+          <div class="user-avatar">${esc((u.displayName||u.username||'?').slice(0,2).toUpperCase())}</div>
+          ${online ? `<span style="position:absolute;bottom:0;right:0;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid var(--bg)"></span>` : ''}
+        </div>
         <div class="user-info">
           <div class="user-name">${esc(u.displayName)}</div>
-          <div class="user-uname">@${esc(u.username || u.email?.split('@')[0] || u.id)}</div>
+          <div class="user-uname">@${esc(u.username || u.email?.split('@')[0] || u.id)}${online ? ' · <span style="color:#22c55e;font-size:.7rem">online</span>' : ''}</div>
         </div>
         <span class="badge ${ROLES[u.role]?.badge||''}">${ROLES[u.role]?.label||u.role}</span>
         ${u.active===false?'<span class="badge badge-inactive" style="margin-left:4px">Nieaktywny</span>':''}
         ${u.active===false?`<button class="hdr-btn" style="color:var(--nowe);background:none;border:none;cursor:pointer;font-size:.85rem;padding:4px 8px" onclick="doDeleteUser('${u.id}','${esc(u.displayName)}')">Usuń</button>`:''}
         <button class="hdr-btn" style="color:var(--muted);background:none;border:none;cursor:pointer;font-size:1rem" onclick="openEditUser('${u.id}')">⚙</button>
-      </div>`).join('')}`;
+      </div>`;
+    }).join('')}`;
 }
 
 function renderAdminConfig(el) {
@@ -1874,6 +1910,7 @@ auth.onAuthStateChanged(async fbUser => {
       role:        ud.role,
     };
     await loadAllData();
+    presenceStart();
     showApp();
   } catch(e) {
     console.error('Init error:', e);
