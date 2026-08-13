@@ -1,7 +1,7 @@
 # Sekrety / dane wrażliwe — nigdy nie commitować
 serviceAccount.json
 *.serviceAccount.json
-"Dane logowania i inne dane wrażliwe w projekcie.txt"
+Dane logowania i inne dane wrażliwe w projekcie.txt
 .env
 .env.*
 
