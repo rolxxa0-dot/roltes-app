@@ -965,7 +965,7 @@ function renderRecentLog() {
 // ═══════════════════════════════════════════════════════════
 // RENDER: ORDERS LIST
 // ═══════════════════════════════════════════════════════════
-let filters = { status:[], zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:'date_desc' };
+let filters = { status:[], numer:'', zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:'date_desc' };
 
 function renderOrders(el) {
   g('hdr-title').textContent = 'Zamówienia';
@@ -997,6 +997,8 @@ function renderOrders(el) {
                onclick="toggleStatusFilter('${k}')">${v.label}</div>`).join('')}
       </div>
       <div class="filter-row" style="margin-top:8px">
+        <input class="filter-input" type="text" placeholder="Nr zamówienia..."
+               value="${esc(filters.numer)}" oninput="filters.numer=this.value;renderOrderList()">
         <input class="filter-input" type="text" placeholder="Szukaj zamawiającego..."
                value="${esc(filters.zamawiajacy)}" oninput="filters.zamawiajacy=this.value;renderOrderList()">
         <select class="filter-select" onchange="filters.produkt=this.value;renderOrderList()">
@@ -1024,6 +1026,7 @@ function renderOrderList() {
   let orders = cache.orders.slice();
 
   if (filters.status.length)       orders = orders.filter(o => filters.status.includes(o.statusRealizacji));
+  if (filters.numer)               orders = orders.filter(o => o.numerZamowienia?.toLowerCase().includes(filters.numer.toLowerCase()));
   if (filters.zamawiajacy)         orders = orders.filter(o => o.zamawiajacy?.toLowerCase().includes(filters.zamawiajacy.toLowerCase()));
   if (filters.produkt)             orders = orders.filter(o => o.rodzajProduktu === filters.produkt);
   if (filters.kolor)               orders = orders.filter(o => o.kolorMaterialu === filters.kolor);
@@ -1078,7 +1081,7 @@ function toggleStatusFilter(s) {
 }
 
 function clearFilters() {
-  filters = { status:[], zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:filters.sort };
+  filters = { status:[], numer:'', zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:filters.sort };
   renderOrders(g('main'));
 }
 
