@@ -840,6 +840,7 @@ async function doLogin() {
 
 // ── Presence (online status) ──────────────────────────────
 let _heartbeat = null;
+let _usersUnsub = null;
 
 function presenceSet(online) {
   const uid = cache.me?.uid;
@@ -847,15 +848,32 @@ function presenceSet(online) {
   db.collection('users').doc(uid).update({ online, lastSeen: new Date().toISOString() }).catch(()=>{});
 }
 
+function startUsersListener() {
+  if (_usersUnsub) return;
+  _usersUnsub = db.collection('users').onSnapshot(snap => {
+    cache.users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (state.screen === 'admin' && (!state.params?.tab || state.params?.tab === 'users')) {
+      const ac = g('admin-content');
+      if (ac) renderAdminUsers(ac);
+    }
+  }, () => {});
+}
+
+function stopUsersListener() {
+  if (_usersUnsub) { _usersUnsub(); _usersUnsub = null; }
+}
+
 function presenceStart() {
   presenceSet(true);
   _heartbeat = setInterval(() => presenceSet(true), 60_000);
+  startUsersListener();
   window.addEventListener('beforeunload', presenceStop);
 }
 
 function presenceStop() {
   clearInterval(_heartbeat);
   _heartbeat = null;
+  stopUsersListener();
   presenceSet(false);
 }
 
