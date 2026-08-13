@@ -1355,7 +1355,7 @@ function renderAdminUsers(el) {
         </div>
         <span class="badge ${ROLES[u.role]?.badge||''}">${ROLES[u.role]?.label||u.role}</span>
         ${u.active===false?'<span class="badge badge-inactive" style="margin-left:4px">Nieaktywny</span>':''}
-        ${u.active===false?`<button class="hdr-btn" style="color:var(--nowe);background:none;border:none;cursor:pointer;font-size:.85rem;padding:4px 8px" onclick="doDeleteUser('${u.id}','${esc(u.displayName)}')">Usuń</button>`:''}
+        ${u.active===false?`<button class="hdr-btn" style="color:var(--nowe);background:none;border:none;cursor:pointer;font-size:.85rem;padding:4px 8px" onclick="doDeleteUser('${u.id}')">Usuń</button>`:''}
         <button class="hdr-btn" style="color:var(--muted);background:none;border:none;cursor:pointer;font-size:1rem" onclick="openEditUser('${u.id}')">⚙</button>
       </div>`;
     }).join('')}`;
@@ -1819,7 +1819,9 @@ async function saveUser() {
   }
 }
 
-function doDeleteUser(uid, displayName) {
+function doDeleteUser(uid) {
+  const u = cache.users.find(x => x.id === uid);
+  const displayName = u?.displayName || u?.username || uid;
   confirm2('Usuń użytkownika', `Konto "${displayName}" zostanie trwale usunięte z systemu. Tej operacji nie można cofnąć.`, 'Usuń', async () => {
     try {
       await fns.httpsCallable('deleteUser')({ uid });
