@@ -900,7 +900,7 @@ function render() {
     case 'dashboard': renderDashboard(main);                    break;
     case 'orders':    renderOrders(main);                       break;
     case 'order':     renderOrderDetail(main, state.params.id); break;
-    case 'materials': renderMaterials(main);                    break;
+    case 'materials': goToMaterials();                          break;
     case 'admin':     renderAdmin(main, state.params.tab||'users'); break;
     default: navigate('dashboard');
   }
@@ -957,7 +957,7 @@ function renderDashboard(el) {
           <div class="tile-count">${orders.length}</div>
           <div class="tile-desc">Wszystkie zamówienia, statusy i filtry</div>
         </div>
-        <div class="tile" onclick="navigate('materials')">
+        <div class="tile" onclick="goToMaterials()">
           <div class="tile-icon ic-orange">🔧</div>
           <div class="tile-name">Potrzebne materiały</div>
           <div class="tile-count" style="color:var(--oczek)">${matCount}</div>
@@ -1109,6 +1109,11 @@ function toggleStatusFilter(s) {
 function clearFilters() {
   filters = { status:[], numer:'', zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:filters.sort };
   renderOrders(g('main'));
+}
+
+function goToMaterials() {
+  filters = { status:['oczekiwanie_na_materialy'], numer:'', zamawiajacy:'', produkt:'', kolor:'', priorytet:'', trasa:'', sort:filters.sort };
+  navigate('orders');
 }
 
 // ═══════════════════════════════════════════════════════════
