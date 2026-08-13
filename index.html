@@ -143,6 +143,7 @@
     .ic-purple { background:#ede9fe; }
     .ic-blue   { background:#dbeafe; }
     .ic-orange { background:#ffedd5; }
+    .ic-teal   { background:#ccfbf1; }
 
     /* ── ORDER LIST ─────────────────────────────────────── */
     .list-toolbar {
@@ -659,6 +660,41 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
+     MODAL — Nowa wysyłka
+══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="modal-shipment" onclick="closeMBg(event,'modal-shipment')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nowa wysyłka</div>
+    <div class="modal-field">
+      <label>Tytuł 1 — data *</label>
+      <input type="date" id="ws-tytul1">
+    </div>
+    <div class="modal-field">
+      <label>Tytuł 2</label>
+      <input type="text" id="ws-tytul2" placeholder="Dowolny tekst" autocomplete="off">
+    </div>
+    <div class="modal-field">
+      <label>Treść</label>
+      <textarea id="ws-tresc" placeholder="Opis wysyłki..."></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Zdjęcia</label>
+      <div id="ws-photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px"></div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px;cursor:pointer;color:var(--muted);font-size:.88rem;font-weight:600;text-transform:none;letter-spacing:0">
+        <span style="font-size:1.4rem">📷</span> Dodaj zdjęcia (galeria lub aparat)
+        <input type="file" id="ws-photos" accept="image/*" multiple style="display:none" onchange="handleWysPhotos(this)">
+      </label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modal-shipment')">Anuluj</button>
+      <button class="btn btn-primary" id="ws-save" onclick="createWysylka()">Utwórz</button>
+    </div>
+    <div class="modal-err" id="ws-err"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
      MODAL — Użytkownik
 ══════════════════════════════════════════════════════════ -->
 <div class="modal-bg" id="modal-user" onclick="closeMBg(event,'modal-user')">
@@ -786,6 +822,11 @@ const PERMS = {
   manageUsers:  ['administrator'],
   manageConfig: ['administrator'],
   viewDrive:    ['administrator'],
+
+  createWysylka:       ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  editWysylka:         ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  manageWysylkaPhotos: ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  deleteWysylka:       ['administrator'],
 };
 
 const DEFAULT_CONFIG = {
@@ -797,10 +838,11 @@ const DEFAULT_CONFIG = {
 // IN-MEMORY CACHE  (renders are synchronous, reads hit cache)
 // ═══════════════════════════════════════════════════════════
 const cache = {
-  orders: [],
-  users:  [],
-  cfg:    { kolory: [...DEFAULT_CONFIG.kolory], produkty: [...DEFAULT_CONFIG.produkty] },
-  me:     null,   // { uid, username, displayName, role }
+  orders:  [],
+  wysylki: [],
+  users:   [],
+  cfg:     { kolory: [...DEFAULT_CONFIG.kolory], produkty: [...DEFAULT_CONFIG.produkty] },
+  me:      null,   // { uid, username, displayName, role }
 };
 
 function getUser()   { return cache.me; }
@@ -814,14 +856,16 @@ function can(action) {
 async function loadAllData() {
   showLoad();
   try {
-    const [ordSnap, usrSnap, cfgSnap] = await Promise.all([
+    const [ordSnap, wysSnap, usrSnap, cfgSnap] = await Promise.all([
       db.collection('orders').orderBy('createdAt', 'desc').get(),
+      db.collection('wysylki').orderBy('createdAt', 'desc').get(),
       db.collection('users').get(),
       db.collection('config').doc('default').get(),
     ]);
-    cache.orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    cache.users  = usrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    cache.cfg    = cfgSnap.exists ? cfgSnap.data() : { ...DEFAULT_CONFIG };
+    cache.orders  = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.wysylki = wysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.users   = usrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.cfg     = cfgSnap.exists ? cfgSnap.data() : { ...DEFAULT_CONFIG };
   } finally {
     hideLoad();
   }
@@ -907,6 +951,7 @@ function navigate(screen, params={}) {
 
 function goBack() {
   if (state.screen === 'order') navigate('orders');
+  else if (state.screen === 'wysylka') navigate('wysylki');
   else navigate('dashboard');
 }
 
@@ -929,6 +974,8 @@ function render() {
     case 'dashboard': renderDashboard(main);                    break;
     case 'orders':    renderOrders(main);                       break;
     case 'order':     renderOrderDetail(main, state.params.id); break;
+    case 'wysylki':   renderWysylki(main);                      break;
+    case 'wysylka':   renderWysylkaDetail(main, state.params.id); break;
     case 'materials': goToMaterials();                          break;
     case 'admin':     renderAdmin(main, state.params.tab||'users'); break;
     default: navigate('dashboard');
@@ -991,6 +1038,12 @@ function renderDashboard(el) {
           <div class="tile-name">Potrzebne materiały</div>
           <div class="tile-count" style="color:var(--oczek)">${matCount}</div>
           <div class="tile-desc">Braki materiałowe z zamówień oczekujących</div>
+        </div>
+        <div class="tile" onclick="navigate('wysylki')">
+          <div class="tile-icon ic-teal">🚚</div>
+          <div class="tile-name">Wysyłki</div>
+          <div class="tile-count">${cache.wysylki.length}</div>
+          <div class="tile-desc">Lista wysyłek, opisy i zdjęcia</div>
         </div>
       </div>
       <div class="section-label" style="margin-top:20px">Ostatnie aktywności</div>
@@ -1710,6 +1763,366 @@ function compressImg(file, maxW=800, q=0.65) {
     };
     img.onerror = rej;
     img.src = url;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: WYSYŁKI — lista
+// ═══════════════════════════════════════════════════════════
+let wysFilters = { tytul1:'', tytul2:'', sort:'tytul1_desc' };
+
+function renderWysylki(el) {
+  g('hdr-title').textContent = 'Wysyłki';
+
+  el.innerHTML = `
+    <div class="list-toolbar">
+      ${can('createWysylka') ? `<button class="btn-new" onclick="openNewWysylka()">+ Nowa</button>` : ''}
+      <select style="margin-left:auto;padding:7px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-size:.8rem;color:var(--muted);outline:none;cursor:pointer"
+              onchange="wysFilters.sort=this.value;renderWysylkaList()">
+        <option value="tytul1_desc"  ${wysFilters.sort==='tytul1_desc' ?'selected':''}>Najnowsza data</option>
+        <option value="tytul1_asc"   ${wysFilters.sort==='tytul1_asc'  ?'selected':''}>Najstarsza data</option>
+        <option value="created_desc" ${wysFilters.sort==='created_desc'?'selected':''}>Data dodania</option>
+      </select>
+    </div>
+
+    <div class="filter-panel">
+      <div class="filter-row">
+        <input class="filter-input" type="text" placeholder="Szukaj po tytule 1 (data)..."
+               value="${esc(wysFilters.tytul1)}" oninput="wysFilters.tytul1=this.value;renderWysylkaList()">
+        <input class="filter-input" type="text" placeholder="Szukaj po tytule 2..."
+               value="${esc(wysFilters.tytul2)}" oninput="wysFilters.tytul2=this.value;renderWysylkaList()">
+        ${(wysFilters.tytul1 || wysFilters.tytul2) ? `
+        <div class="filter-chip" onclick="wysFilters.tytul1='';wysFilters.tytul2='';renderWysylki(g('main'))" style="color:var(--nowe)">✕ Wyczyść</div>` : ''}
+      </div>
+    </div>
+
+    <div id="wys-list-wrap" class="order-list"></div>`;
+
+  renderWysylkaList();
+}
+
+function renderWysylkaList() {
+  const wrap = g('wys-list-wrap');
+  if (!wrap) return;
+  let items = cache.wysylki.slice();
+
+  if (wysFilters.tytul1) {
+    const q = wysFilters.tytul1.toLowerCase();
+    items = items.filter(w => (w.tytul1||'').toLowerCase().includes(q) || fmtDate(w.tytul1).toLowerCase().includes(q));
+  }
+  if (wysFilters.tytul2) {
+    const q = wysFilters.tytul2.toLowerCase();
+    items = items.filter(w => (w.tytul2||'').toLowerCase().includes(q));
+  }
+
+  const sortFns = {
+    tytul1_desc:  (a,b) => (b.tytul1||'').localeCompare(a.tytul1||''),
+    tytul1_asc:   (a,b) => (a.tytul1||'').localeCompare(b.tytul1||''),
+    created_desc: (a,b) => new Date(b.createdAt)-new Date(a.createdAt),
+  };
+  items.sort(sortFns[wysFilters.sort] || sortFns.tytul1_desc);
+
+  if (!items.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p class="empty-text">Brak wysyłek spełniających kryteria</p></div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(w => `
+    <div class="order-card" onclick="navigate('wysylka',{id:'${w.id}'})">
+      <div class="order-card-top">
+        <span class="order-num">📅 ${fmtDate(w.tytul1)}</span>
+      </div>
+      <div class="order-card-mid">
+        <div class="order-client">${esc(w.tytul2) || '<span style="color:var(--muted)">Bez tytułu 2</span>'}</div>
+      </div>
+      <div class="order-card-bot">
+        <span>${(w.zdjecia||[]).length} zdjęć</span>
+        ${w.createdBy?`<span>${esc(w.createdBy)}</span>`:''}
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER: WYSYŁKI — szczegóły
+// ═══════════════════════════════════════════════════════════
+function renderWysylkaDetail(el, id) {
+  const w = cache.wysylki.find(x => x.id === id);
+  if (!w) { toast('Nie znaleziono wysyłki'); navigate('wysylki'); return; }
+
+  g('hdr-title').innerHTML = `Wysyłka <small>${fmtDate(w.tytul1)}</small>`;
+
+  const ro       = !can('editWysylka');
+  const roPhotos = !can('manageWysylkaPhotos');
+
+  el.innerHTML = `
+    <div class="page">
+      <div class="det-section">
+        <div class="det-section-title">Tytuły</div>
+        <div class="det-field">
+          <label>Tytuł 1 — data</label>
+          <input id="w-tytul1" type="date" value="${w.tytul1||''}" ${ro?'readonly':''}>
+        </div>
+        <div class="det-field">
+          <label>Tytuł 2</label>
+          <input id="w-tytul2" type="text" value="${esc(w.tytul2||'')}" ${ro?'readonly':''}>
+        </div>
+      </div>
+
+      <div class="det-section">
+        <div class="det-section-title">Treść</div>
+        <div class="det-field">
+          <textarea id="w-tresc" ${ro?'readonly':''}
+                    placeholder="${ro?'Brak uprawnień do edycji':'Wpisz treść...'}"
+          >${esc(w.tresc||'')}</textarea>
+        </div>
+      </div>
+
+      ${!ro ? `<button class="btn btn-primary" onclick="saveWysylka('${id}')">Zapisz zmiany</button>` : ''}
+
+      <div class="det-section mt8">
+        <div class="det-section-title">Zdjęcia (${(w.zdjecia||[]).length})</div>
+        <div class="photo-grid" id="wys-photo-grid-${id}">
+          ${(w.zdjecia||[]).map(z => {
+            const thumb = `https://drive.google.com/thumbnail?id=${z.id}&sz=w400`;
+            const full  = `https://drive.google.com/thumbnail?id=${z.id}&sz=w1600`;
+            return `<div class="photo-thumb" data-zid="${z.id}">
+              <img src="${thumb}" onclick="openImg('${full}')" alt="${esc(z.name)}" loading="lazy">
+              ${!roPhotos?`<button class="photo-del" onclick="deleteWysPhoto('${id}','${z.id}')">✕</button>`:''}
+            </div>`;
+          }).join('')}
+          ${!roPhotos?`
+            <div class="photo-add" onclick="g('wys-photo-in-${id}').click()">
+              <span class="photo-add-icon">📷</span>Dodaj
+            </div>
+            <input type="file" id="wys-photo-in-${id}" class="file-input-hidden" accept="image/*" multiple
+                   onchange="uploadWysPhotos('${id}',this)">`:''}
+        </div>
+        ${roPhotos?`<div style="padding:0 16px 12px;font-size:.75rem;color:var(--muted)">
+          Zarządzanie zdjęciami wymaga dodatkowych uprawnień.</div>`:''}
+      </div>
+
+      ${can('deleteWysylka') ? `
+      <button class="btn btn-danger mt8" onclick="deleteWysylka('${id}')">Usuń wysyłkę</button>
+      ` : ''}
+
+      <div class="det-section mt8">
+        <div class="det-section-title">Historia zmian</div>
+        <div class="log-list">
+          ${[...(w.log||[])].reverse().map(l=>`
+            <div class="log-item">
+              <span class="log-who">${esc(l.displayName||l.username)}</span>
+              — ${esc(l.action)}
+              <div class="log-time">${fmtDateTime(l.timestamp)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CRUD — WYSYŁKI
+// ═══════════════════════════════════════════════════════════
+let pendingWysPhotos = [];
+
+function openNewWysylka() {
+  g('ws-tytul1').value = new Date().toISOString().slice(0,10);
+  g('ws-tytul2').value = '';
+  g('ws-tresc').value  = '';
+  g('ws-err').textContent = '';
+  g('ws-save').disabled = false;
+  g('ws-save').textContent = 'Utwórz';
+  pendingWysPhotos = [];
+  openModal('modal-shipment');
+  renderWysPhotoGrid();
+}
+
+async function createWysylka() {
+  const tytul1 = g('ws-tytul1').value;
+  if (!tytul1) { g('ws-err').textContent = 'Wybierz datę (tytuł 1).'; return; }
+
+  const btn = g('ws-save');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const u  = cache.me;
+  const id = 'wys-' + Math.random().toString(36).slice(2,10);
+  const w = {
+    id,
+    tytul1,
+    tytul2:    g('ws-tytul2').value.trim(),
+    tresc:     g('ws-tresc').value,
+    zdjecia:   [],
+    createdBy: u.username,
+    log:       [{ timestamp:nowISO(), username:u.username, displayName:u.displayName,
+                  action:'Utworzenie wysyłki' }],
+    createdAt: nowISO(),
+  };
+
+  try {
+    await db.collection('wysylki').doc(id).set(w);
+    cache.wysylki.unshift(w);
+
+    if (pendingWysPhotos.length > 0) {
+      showLoad();
+      for (const ph of pendingWysPhotos) {
+        try {
+          const base64 = ph.data.replace(/^data:[^;]+;base64,/, '');
+          const mime   = ph.data.match(/^data:([^;]+);/)?.[1] || 'image/jpeg';
+          const res    = await fns.httpsCallable('uploadPhoto')({
+            budowaId: id, numerZamowienia: tytul1, collection: 'wysylki',
+            fileBase64: base64, fileName: ph.name, mimeType: mime,
+          });
+          const z = { id: res.data.id, name: res.data.name, viewLink: res.data.viewLink };
+          w.zdjecia.push(z);
+          w.log.push({ timestamp: nowISO(), username: u.username, displayName: u.displayName,
+                       action: 'Dodanie zdjęcia: ' + ph.name });
+          await db.collection('wysylki').doc(id).update({ zdjecia: w.zdjecia, log: w.log });
+        } catch(e) { toast('Błąd uploadu: ' + ph.name); }
+      }
+      hideLoad();
+    }
+
+    pendingWysPhotos = [];
+    closeModal('modal-shipment');
+    toast('Wysyłka utworzona');
+    navigate('wysylka', { id });
+  } catch(e) {
+    g('ws-err').textContent = 'Błąd: ' + (e.message || e);
+    btn.disabled = false;
+    btn.textContent = 'Utwórz';
+  }
+}
+
+async function handleWysPhotos(input) {
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+  showLoad();
+  for (const file of files) {
+    try {
+      const data = await compressImg(file);
+      pendingWysPhotos.push({ id:'z'+Math.random().toString(36).slice(2,10), name:file.name, data });
+    } catch(e) { toast('Błąd: '+file.name); }
+  }
+  hideLoad();
+  renderWysPhotoGrid();
+}
+
+function renderWysPhotoGrid() {
+  const grid = g('ws-photo-grid');
+  if (!grid) return;
+  grid.innerHTML = pendingWysPhotos.map(z=>`
+    <div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--border)">
+      <img src="${z.data}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="pendingWysPhotos=pendingWysPhotos.filter(p=>p.id!=='${z.id}');renderWysPhotoGrid()"
+              style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`).join('');
+}
+
+async function saveWysylka(id) {
+  const idx = cache.wysylki.findIndex(w => w.id === id);
+  if (idx === -1) return;
+  const w = cache.wysylki[idx];
+  const u = cache.me;
+  const changes = [];
+
+  const t1 = g('w-tytul1')?.value;
+  const t2 = g('w-tytul2')?.value?.trim();
+  const tr = g('w-tresc')?.value;
+
+  if (t1 && t1 !== w.tytul1)                 { changes.push('Zmiana tytułu 1 (data) na: '+fmtDate(t1)); w.tytul1 = t1; }
+  if (t2 !== undefined && t2 !== w.tytul2)   { changes.push('Zmiana tytułu 2'); w.tytul2 = t2; }
+  if (tr !== undefined && tr !== w.tresc)    { changes.push('Aktualizacja treści'); w.tresc = tr; }
+
+  if (changes.length) {
+    w.log = [...(w.log||[]), { timestamp:nowISO(), username:u.username, displayName:u.displayName, action:changes.join('; ') }];
+  }
+
+  showLoad();
+  try {
+    await db.collection('wysylki').doc(id).set(w);
+    toast('Zapisano');
+    renderWysylkaDetail(g('main'), id);
+  } catch(e) {
+    toast('Błąd zapisu: ' + (e.message || e));
+  } finally {
+    hideLoad();
+  }
+}
+
+function deleteWysylka(id) {
+  confirm2('Usuń wysyłkę', 'Tej operacji nie można cofnąć. Wszystkie dane i zdjęcia wysyłki zostaną trwale usunięte.', 'Usuń', async () => {
+    showLoad();
+    try {
+      const w = cache.wysylki.find(x => x.id === id);
+      if (w?.driveFolderId) {
+        try { await fns.httpsCallable('deleteDriveFolder')({ folderId: w.driveFolderId }); } catch(e) {}
+      }
+      await db.collection('wysylki').doc(id).delete();
+      cache.wysylki = cache.wysylki.filter(x => x.id !== id);
+      toast('Wysyłka usunięta');
+      navigate('wysylki');
+    } catch(e) {
+      toast('Błąd usuwania: ' + (e.message || e));
+    } finally {
+      hideLoad();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// WYSYŁKI — zdjęcia (Google Drive, ta sama Cloud Function co zamówienia)
+// ═══════════════════════════════════════════════════════════
+async function uploadWysPhotos(wysId, input) {
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+
+  const w = cache.wysylki.find(x => x.id === wysId);
+  if (!w) return;
+  const u = cache.me;
+
+  showLoad();
+  for (const file of files) {
+    try {
+      const data   = await compressImg(file);
+      const base64 = data.replace(/^data:[^;]+;base64,/, '');
+      const mime   = data.match(/^data:([^;]+);/)?.[1] || 'image/jpeg';
+      const res    = await fns.httpsCallable('uploadPhoto')({
+        budowaId: wysId, numerZamowienia: w.tytul1, collection: 'wysylki',
+        fileBase64: base64, fileName: file.name, mimeType: mime,
+      });
+      const z = { id: res.data.id, name: res.data.name, viewLink: res.data.viewLink };
+      w.zdjecia = [...(w.zdjecia||[]), z];
+      w.log = [...(w.log||[]), {
+        timestamp: nowISO(), username: u.username, displayName: u.displayName,
+        action: 'Dodanie zdjęcia: ' + file.name,
+      }];
+      await db.collection('wysylki').doc(wysId).update({ zdjecia: w.zdjecia, log: w.log });
+    } catch(e) { console.error(e); toast('Błąd uploadu: ' + file.name); }
+  }
+  hideLoad();
+  renderWysylkaDetail(g('main'), wysId);
+}
+
+function deleteWysPhoto(wysId, zid) {
+  confirm2('Usuń zdjęcie', 'Zdjęcie zostanie trwale usunięte z Google Drive.', 'Usuń', async () => {
+    const w = cache.wysylki.find(x => x.id === wysId);
+    if (!w) return;
+    const z = (w.zdjecia||[]).find(z=>z.id===zid);
+    const u = cache.me;
+    showLoad();
+    try {
+      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id });
+      w.zdjecia = (w.zdjecia||[]).filter(z=>z.id!==zid);
+      w.log = [...(w.log||[]), {
+        timestamp: nowISO(), username: u.username, displayName: u.displayName,
+        action: 'Usunięcie zdjęcia' + (z ? ': '+z.name : ''),
+      }];
+      await db.collection('wysylki').doc(wysId).update({ zdjecia: w.zdjecia, log: w.log });
+      renderWysylkaDetail(g('main'), wysId);
+    } catch(e) { toast('Błąd usuwania: ' + (e.message || e)); }
+    finally { hideLoad(); }
   });
 }
 
