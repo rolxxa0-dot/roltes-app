@@ -518,9 +518,20 @@
       position:fixed; inset:0; background:#000;
       z-index:250; display:flex; align-items:center;
       justify-content:center; cursor:pointer;
+      overflow:hidden; touch-action:none;
     }
     .img-fs.hidden { display:none; }
-    .img-fs img { max-width:100%; max-height:100%; object-fit:contain; }
+    .img-fs img {
+      max-width:100%; max-height:100%; object-fit:contain;
+      touch-action:none; user-select:none; -webkit-user-select:none;
+      -webkit-touch-callout:none;
+      transform-origin:center center;
+      transition:transform .2s ease;
+      will-change:transform;
+    }
+    .img-fs img.zooming { transition:none; }
+    .img-fs.zoomed { cursor:grab; }
+    .img-fs.zoomed.dragging { cursor:grabbing; }
     .img-fs-close {
       position:absolute; top:14px; right:14px;
       background:rgba(255,255,255,.2); border:none; color:#fff;
@@ -556,8 +567,8 @@
 <div class="toast" id="toast"></div>
 
 <!-- Image fullscreen -->
-<div class="img-fs hidden" id="img-fs" onclick="closeImg()">
-  <button class="img-fs-close">✕</button>
+<div class="img-fs hidden" id="img-fs">
+  <button class="img-fs-close" onclick="closeImg()">✕</button>
   <img id="img-full" src="" alt="">
 </div>
 
@@ -1891,8 +1902,142 @@ function confirmResolve(yes) {
 // ═══════════════════════════════════════════════════════════
 // IMAGE VIEWER
 // ═══════════════════════════════════════════════════════════
-function openImg(src) { g('img-full').src=src; g('img-fs').classList.remove('hidden'); }
-function closeImg()   { g('img-fs').classList.add('hidden'); g('img-full').src=''; }
+function openImg(src) { g('img-full').src=src; resetImgZoom(); g('img-fs').classList.remove('hidden'); }
+function closeImg()   { g('img-fs').classList.add('hidden'); g('img-full').src=''; resetImgZoom(); }
+
+// ═══════════════════════════════════════════════════════════
+// Pinch-to-zoom / pan dla podglądu zdjęcia (działa dla wszystkich
+// kafelków, obecnych i przyszłych — każdy używa openImg()).
+// ═══════════════════════════════════════════════════════════
+const imgZoom = { scale:1, x:0, y:0, pointers:{}, panning:false, moved:false, startDist:0, startScale:1, startX:0, startY:0, lastTap:0 };
+const IMG_ZOOM_MIN = 1, IMG_ZOOM_MAX = 5;
+
+function resetImgZoom() {
+  imgZoom.scale=1; imgZoom.x=0; imgZoom.y=0; imgZoom.pointers={};
+  imgZoom.panning=false; imgZoom.moved=false; imgZoom.lastTap=0;
+  const img = g('img-full');
+  img.classList.remove('zooming');
+  g('img-fs').classList.remove('zoomed','dragging');
+  applyImgTransform();
+}
+
+function applyImgTransform() {
+  g('img-full').style.transform = `translate(${imgZoom.x}px, ${imgZoom.y}px) scale(${imgZoom.scale})`;
+  g('img-fs').classList.toggle('zoomed', imgZoom.scale > 1.01);
+}
+
+function imgPointDist(a,b) { return Math.hypot(a.x-b.x, a.y-b.y); }
+function imgClamp(v,min,max) { return Math.min(max, Math.max(min, v)); }
+
+function clampImgPan() {
+  const img = g('img-full');
+  const rect = img.getBoundingClientRect();
+  const fsRect = g('img-fs').getBoundingClientRect();
+  // ile obrazu (w px, przy aktualnej skali) wystaje poza kontener
+  const overflowX = Math.max(0, (rect.width  - fsRect.width)  / 2);
+  const overflowY = Math.max(0, (rect.height - fsRect.height) / 2);
+  imgZoom.x = imgClamp(imgZoom.x, -overflowX, overflowX);
+  imgZoom.y = imgClamp(imgZoom.y, -overflowY, overflowY);
+}
+
+function toggleImgZoomAt(clientX, clientY) {
+  const img = g('img-full');
+  img.classList.remove('zooming');
+  if (imgZoom.scale > 1.01) {
+    imgZoom.scale = 1; imgZoom.x = 0; imgZoom.y = 0;
+  } else {
+    const rect = img.getBoundingClientRect();
+    const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+    imgZoom.scale = 2.5;
+    imgZoom.x = (cx - clientX) * (imgZoom.scale - 1);
+    imgZoom.y = (cy - clientY) * (imgZoom.scale - 1);
+    clampImgPan();
+  }
+  applyImgTransform();
+}
+
+function imgFsPointerDown(e) {
+  if (e.target.closest('.img-fs-close')) return;
+  const fs = g('img-fs');
+  fs.setPointerCapture(e.pointerId);
+  imgZoom.pointers[e.pointerId] = { x:e.clientX, y:e.clientY };
+  const pts = Object.values(imgZoom.pointers);
+  imgZoom.moved = false;
+  g('img-full').classList.add('zooming');
+
+  if (pts.length === 1) {
+    imgZoom.panning = true;
+    imgZoom.startX = e.clientX - imgZoom.x;
+    imgZoom.startY = e.clientY - imgZoom.y;
+    const now = Date.now();
+    if (now - imgZoom.lastTap < 300) {
+      imgZoom.lastTap = 0;
+      imgZoom.panning = false;
+      toggleImgZoomAt(e.clientX, e.clientY);
+    } else {
+      imgZoom.lastTap = now;
+    }
+  } else if (pts.length === 2) {
+    imgZoom.panning = false;
+    imgZoom.startDist = imgPointDist(pts[0], pts[1]);
+    imgZoom.startScale = imgZoom.scale;
+  }
+}
+
+function imgFsPointerMove(e) {
+  if (!imgZoom.pointers[e.pointerId]) return;
+  imgZoom.pointers[e.pointerId] = { x:e.clientX, y:e.clientY };
+  const pts = Object.values(imgZoom.pointers);
+
+  if (pts.length === 1 && imgZoom.panning) {
+    imgZoom.x = e.clientX - imgZoom.startX;
+    imgZoom.y = e.clientY - imgZoom.startY;
+    imgZoom.moved = true;
+    g('img-fs').classList.add('dragging');
+    applyImgTransform();
+  } else if (pts.length === 2) {
+    const d = imgPointDist(pts[0], pts[1]);
+    if (imgZoom.startDist > 0) {
+      imgZoom.scale = imgClamp(imgZoom.startScale * (d / imgZoom.startDist), IMG_ZOOM_MIN, IMG_ZOOM_MAX);
+      imgZoom.moved = true;
+      applyImgTransform();
+    }
+  }
+}
+
+function imgFsPointerUp(e) {
+  delete imgZoom.pointers[e.pointerId];
+  const pts = Object.values(imgZoom.pointers);
+  const wasTap = !imgZoom.moved;
+  const tappedBackdrop = e.target.id === 'img-fs';
+
+  if (pts.length === 1) {
+    // jeden palec został po zdjęciu drugiego przy pinchu — kontynuuj jako przesuwanie
+    imgZoom.panning = true;
+    imgZoom.startX = pts[0].x - imgZoom.x;
+    imgZoom.startY = pts[0].y - imgZoom.y;
+  } else if (pts.length === 0) {
+    imgZoom.panning = false;
+    g('img-fs').classList.remove('dragging');
+    g('img-full').classList.remove('zooming');
+    if (imgZoom.scale <= 1.01) {
+      imgZoom.scale = 1; imgZoom.x = 0; imgZoom.y = 0;
+      applyImgTransform();
+    } else {
+      clampImgPan();
+      applyImgTransform();
+    }
+    if (wasTap && imgZoom.scale <= 1.01 && tappedBackdrop) closeImg();
+  }
+}
+
+(function initImgFsGestures(){
+  const fs = g('img-fs');
+  fs.addEventListener('pointerdown', imgFsPointerDown);
+  fs.addEventListener('pointermove', imgFsPointerMove);
+  fs.addEventListener('pointerup',   imgFsPointerUp);
+  fs.addEventListener('pointercancel', imgFsPointerUp);
+})();
 
 // ═══════════════════════════════════════════════════════════
 // UTILS
