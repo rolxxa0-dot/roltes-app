@@ -664,7 +664,11 @@
     </div>
     <div class="modal-field" id="mu-pass-wrap">
       <label>Hasło *</label>
-      <input type="password" id="mu-pass" placeholder="min. 8 znaków" autocomplete="new-password">
+      <input type="password" id="mu-pass" placeholder="min. 10 znaków" autocomplete="new-password"
+             oninput="validatePassInput()">
+      <div id="mu-pass-hint" style="font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.5">
+        Wymagane: min. 10 znaków, wielka litera, cyfra, znak specjalny (!@#$%…)
+      </div>
     </div>
     <div class="modal-field">
       <label>Rola</label>
@@ -1641,6 +1645,31 @@ function compressImg(file, maxW=800, q=0.65) {
 // ═══════════════════════════════════════════════════════════
 // CRUD — USERS  (via Cloud Functions — admin SDK required)
 // ═══════════════════════════════════════════════════════════
+function checkPassword(pass) {
+  if (pass.length < 10)              return 'Hasło musi mieć co najmniej 10 znaków.';
+  if (!/[A-Z]/.test(pass))           return 'Hasło musi zawierać co najmniej jedną wielką literę.';
+  if (!/[0-9]/.test(pass))           return 'Hasło musi zawierać co najmniej jedną cyfrę.';
+  if (!/[^A-Za-z0-9]/.test(pass))   return 'Hasło musi zawierać co najmniej jeden znak specjalny (!@#$%...).';
+  return null;
+}
+
+function validatePassInput() {
+  const pass = g('mu-pass').value;
+  const hint = g('mu-pass-hint');
+  if (!pass) {
+    hint.style.color = 'var(--muted)';
+    hint.textContent = 'Wymagane: min. 10 znaków, wielka litera, cyfra, znak specjalny (!@#$%…)';
+    return;
+  }
+  const err = checkPassword(pass);
+  if (err) {
+    hint.style.color = 'var(--nowe)';
+    hint.textContent = '✗ ' + err;
+  } else {
+    hint.style.color = 'var(--gotowe,#16a34a)';
+    hint.textContent = '✓ Hasło spełnia wymagania';
+  }
+}
 let editingUserId = null;
 
 function openNewUser() {
@@ -1693,7 +1722,11 @@ async function saveUser() {
     if (editingUserId) {
       const active = g('mu-active').value === 'true';
       const payload = { uid: editingUserId, displayName: name, role, active };
-      if (pass.length >= 8) payload.password = pass;
+      if (pass.length > 0) {
+        const passErr = checkPassword(pass);
+        if (passErr) { err.textContent = passErr; btn.disabled=false; btn.textContent='Zapisz'; return; }
+        payload.password = pass;
+      }
       await fns.httpsCallable('updateUser')(payload);
       const idx = cache.users.findIndex(u=>u.id===editingUserId);
       if (idx >= 0) Object.assign(cache.users[idx], { displayName: name, role, active });
@@ -1701,8 +1734,9 @@ async function saveUser() {
       toast('Użytkownik zaktualizowany');
       renderAdmin(g('main'), 'users');
     } else {
-      if (!uname)       { err.textContent='Podaj login.'; btn.disabled=false; btn.textContent='Utwórz'; return; }
-      if (pass.length<8){ err.textContent='Hasło min. 8 znaków.'; btn.disabled=false; btn.textContent='Utwórz'; return; }
+      if (!uname) { err.textContent='Podaj login.'; btn.disabled=false; btn.textContent='Utwórz'; return; }
+      const passErr = checkPassword(pass);
+      if (passErr) { err.textContent=passErr; btn.disabled=false; btn.textContent='Utwórz'; return; }
       if (cache.users.find(u=>(u.username||u.email?.split('@')[0])===uname)) {
         err.textContent='Login już istnieje.'; btn.disabled=false; btn.textContent='Utwórz'; return;
       }
