@@ -803,11 +803,11 @@ const ROLES = {
 };
 
 const ROLE_DESCRIPTIONS = {
-  administrator: 'Pełny dostęp do systemu: tworzenie, edycja i usuwanie zamówień oraz użytkowników. Dostęp do panelu administracyjnego, zarządzania listami i podglądu statusu Google Drive.',
-  kierownik:     'Pełny dostęp do zamówień: tworzenie, edycja numerów, dat, szczegółów, dodawanie i usuwanie zdjęć, zmiana statusu. Nie może zarządzać użytkownikami ani konfiguracją systemu.',
-  produkcja:     'Może tylko zmieniać status realizacji zamówień i dodawać komentarze (np. potrzebne materiały). Nie może zmieniać dat, numerów ani innych danych zamówienia.',
-  biuro:         'Może zmieniać daty zamówień (data zamówienia, planowana data montażu) oraz status realizacji. Może dodawać komentarze. Nie może edytować pozostałych pól.',
-  readonly:      'Dostęp wyłącznie do przeglądania zamówień i materiałów. Żadna edycja nie jest możliwa.',
+  administrator: 'Pełny dostęp do systemu: tworzenie, edycja i usuwanie zamówień oraz użytkowników. Dostęp do panelu administracyjnego, zarządzania listami i podglądu statusu Google Drive. Pełny dostęp do wysyłek — tworzenie, edycja i usuwanie wpisów oraz zdjęć.',
+  kierownik:     'Pełny dostęp do zamówień: tworzenie, edycja numerów, dat, szczegółów, dodawanie i usuwanie zdjęć, zmiana statusu. Nie może zarządzać użytkownikami ani konfiguracją systemu. Pełny dostęp do edycji wysyłek: tworzenie, edycja tytułów i treści, dodawanie i usuwanie zdjęć. Usuwanie całej wysyłki zastrzeżone dla administratora.',
+  produkcja:     'Może tylko zmieniać status realizacji zamówień i dodawać komentarze (np. potrzebne materiały). Nie może zmieniać dat, numerów ani innych danych zamówienia. Brak dostępu do modułu Wysyłki — kafelek nie jest widoczny w menu.',
+  biuro:         'Może zmieniać daty zamówień (data zamówienia, planowana data montażu) oraz status realizacji. Może dodawać komentarze. Nie może edytować pozostałych pól. W module Wysyłki ma dostęp wyłącznie do odczytu — może przeglądać wpisy i zdjęcia, ale nie może ich edytować ani dodawać.',
+  readonly:      'Dostęp wyłącznie do przeglądania zamówień i materiałów. Żadna edycja nie jest możliwa. To samo dotyczy modułu Wysyłki — podgląd bez możliwości edycji.',
 };
 
 const PERMS = {
@@ -823,9 +823,10 @@ const PERMS = {
   manageConfig: ['administrator'],
   viewDrive:    ['administrator'],
 
-  createWysylka:       ['administrator', 'kierownik', 'produkcja', 'biuro'],
-  editWysylka:         ['administrator', 'kierownik', 'produkcja', 'biuro'],
-  manageWysylkaPhotos: ['administrator', 'kierownik', 'produkcja', 'biuro'],
+  viewWysylki:         ['administrator', 'kierownik', 'biuro', 'readonly'],
+  createWysylka:       ['administrator', 'kierownik'],
+  editWysylka:         ['administrator', 'kierownik'],
+  manageWysylkaPhotos: ['administrator', 'kierownik'],
   deleteWysylka:       ['administrator'],
 };
 
@@ -856,14 +857,15 @@ function can(action) {
 async function loadAllData() {
   showLoad();
   try {
+    const canViewWys = cache.me?.role !== 'produkcja';
     const [ordSnap, wysSnap, usrSnap, cfgSnap] = await Promise.all([
       db.collection('orders').orderBy('createdAt', 'desc').get(),
-      db.collection('wysylki').orderBy('createdAt', 'desc').get(),
+      canViewWys ? db.collection('wysylki').orderBy('createdAt', 'desc').get() : Promise.resolve(null),
       db.collection('users').get(),
       db.collection('config').doc('default').get(),
     ]);
     cache.orders  = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    cache.wysylki = wysSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    cache.wysylki = wysSnap ? wysSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
     cache.users   = usrSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     cache.cfg     = cfgSnap.exists ? cfgSnap.data() : { ...DEFAULT_CONFIG };
   } finally {
@@ -1039,12 +1041,13 @@ function renderDashboard(el) {
           <div class="tile-count" style="color:var(--oczek)">${matCount}</div>
           <div class="tile-desc">Braki materiałowe z zamówień oczekujących</div>
         </div>
+        ${can('viewWysylki') ? `
         <div class="tile" onclick="navigate('wysylki')">
           <div class="tile-icon ic-teal">🚚</div>
           <div class="tile-name">Wysyłki</div>
           <div class="tile-count">${cache.wysylki.length}</div>
           <div class="tile-desc">Lista wysyłek, opisy i zdjęcia</div>
-        </div>
+        </div>` : ''}
       </div>
       <div class="section-label" style="margin-top:20px">Ostatnie aktywności</div>
       ${renderRecentLog()}
@@ -1772,6 +1775,7 @@ function compressImg(file, maxW=800, q=0.65) {
 let wysFilters = { tytul1:'', tytul2:'', sort:'tytul1_desc' };
 
 function renderWysylki(el) {
+  if (!can('viewWysylki')) { toast('Brak uprawnień do modułu Wysyłki'); navigate('dashboard'); return; }
   g('hdr-title').textContent = 'Wysyłki';
 
   el.innerHTML = `
@@ -1846,6 +1850,7 @@ function renderWysylkaList() {
 // RENDER: WYSYŁKI — szczegóły
 // ═══════════════════════════════════════════════════════════
 function renderWysylkaDetail(el, id) {
+  if (!can('viewWysylki')) { toast('Brak uprawnień do modułu Wysyłki'); navigate('dashboard'); return; }
   const w = cache.wysylki.find(x => x.id === id);
   if (!w) { toast('Nie znaleziono wysyłki'); navigate('wysylki'); return; }
 
