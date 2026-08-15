@@ -1109,6 +1109,8 @@ function renderOrders(el) {
         <option value="date_asc"  ${filters.sort==='date_asc' ?'selected':''}>Najstarsze</option>
         <option value="plan_asc"  ${filters.sort==='plan_asc' ?'selected':''}>Planowana data ↑</option>
         <option value="status"    ${filters.sort==='status'   ?'selected':''}>Wg statusu</option>
+        <option value="num_asc"   ${filters.sort==='num_asc'  ?'selected':''}>Numer A-Z</option>
+        <option value="num_desc"  ${filters.sort==='num_desc' ?'selected':''}>Numer Z-A</option>
       </select>
     </div>
 
@@ -1161,6 +1163,8 @@ function renderOrderList() {
     date_asc:  (a,b) => new Date(a.createdAt)-new Date(b.createdAt),
     plan_asc:  (a,b) => (a.planowanaData||'9').localeCompare(b.planowanaData||'9'),
     status:    (a,b) => Object.keys(STATUS).indexOf(a.statusRealizacji)-Object.keys(STATUS).indexOf(b.statusRealizacji),
+    num_asc:   (a,b) => (a.numerZamowienia||'').localeCompare(b.numerZamowienia||'', undefined, {numeric:true, sensitivity:'base'}),
+    num_desc:  (a,b) => (b.numerZamowienia||'').localeCompare(a.numerZamowienia||'', undefined, {numeric:true, sensitivity:'base'}),
   };
   orders.sort(sortFns[filters.sort] || sortFns.date_desc);
 
@@ -1803,6 +1807,8 @@ function renderWysylki(el) {
         <option value="tytul1_desc"  ${wysFilters.sort==='tytul1_desc' ?'selected':''}>Najnowsza data</option>
         <option value="tytul1_asc"   ${wysFilters.sort==='tytul1_asc'  ?'selected':''}>Najstarsza data</option>
         <option value="created_desc" ${wysFilters.sort==='created_desc'?'selected':''}>Data dodania</option>
+        <option value="tytul2_asc"   ${wysFilters.sort==='tytul2_asc'  ?'selected':''}>Tytuł 2 A-Z</option>
+        <option value="tytul2_desc"  ${wysFilters.sort==='tytul2_desc' ?'selected':''}>Tytuł 2 Z-A</option>
       </select>
     </div>
 
@@ -1840,6 +1846,8 @@ function renderWysylkaList() {
     tytul1_desc:  (a,b) => (b.tytul1||'').localeCompare(a.tytul1||''),
     tytul1_asc:   (a,b) => (a.tytul1||'').localeCompare(b.tytul1||''),
     created_desc: (a,b) => new Date(b.createdAt)-new Date(a.createdAt),
+    tytul2_asc:   (a,b) => (a.tytul2||'').localeCompare(b.tytul2||'', undefined, {numeric:true, sensitivity:'base'}),
+    tytul2_desc:  (a,b) => (b.tytul2||'').localeCompare(a.tytul2||'', undefined, {numeric:true, sensitivity:'base'}),
   };
   items.sort(sortFns[wysFilters.sort] || sortFns.tytul1_desc);
 
