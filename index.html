@@ -646,10 +646,16 @@
     <div class="modal-field">
       <label>Zdjęcia</label>
       <div id="mo-photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px"></div>
-      <label style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px;cursor:pointer;color:var(--muted);font-size:.88rem;font-weight:600;text-transform:none;letter-spacing:0">
-        <span style="font-size:1.4rem">📷</span> Dodaj zdjęcia (galeria lub aparat)
-        <input type="file" id="mo-photos" accept="image/*" multiple style="display:none" onchange="handleMoPhotos(this)">
-      </label>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px 8px;cursor:pointer;color:var(--muted);font-size:.82rem;font-weight:600;text-align:center">
+          <span style="font-size:1.4rem">📷</span> Zrób zdjęcie
+          <input type="file" id="mo-photos-camera" accept="image/*" capture="environment" style="display:none" onchange="handleMoPhotos(this)">
+        </label>
+        <label style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px 8px;cursor:pointer;color:var(--muted);font-size:.82rem;font-weight:600;text-align:center">
+          <span style="font-size:1.4rem">🖼️</span> Wybierz z galerii
+          <input type="file" id="mo-photos-gallery" accept="image/*" multiple style="display:none" onchange="handleMoPhotos(this)">
+        </label>
+      </div>
     </div>
     <div class="modal-btns">
       <button class="btn btn-ghost" onclick="closeModal('modal-order')">Anuluj</button>
@@ -681,10 +687,16 @@
     <div class="modal-field">
       <label>Zdjęcia</label>
       <div id="ws-photo-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px"></div>
-      <label style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px;cursor:pointer;color:var(--muted);font-size:.88rem;font-weight:600;text-transform:none;letter-spacing:0">
-        <span style="font-size:1.4rem">📷</span> Dodaj zdjęcia (galeria lub aparat)
-        <input type="file" id="ws-photos" accept="image/*" multiple style="display:none" onchange="handleWysPhotos(this)">
-      </label>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px 8px;cursor:pointer;color:var(--muted);font-size:.82rem;font-weight:600;text-align:center">
+          <span style="font-size:1.4rem">📷</span> Zrób zdjęcie
+          <input type="file" id="ws-photos-camera" accept="image/*" capture="environment" style="display:none" onchange="handleWysPhotos(this)">
+        </label>
+        <label style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg);border:1.5px dashed var(--border);border-radius:8px;padding:13px 8px;cursor:pointer;color:var(--muted);font-size:.82rem;font-weight:600;text-align:center">
+          <span style="font-size:1.4rem">🖼️</span> Wybierz z galerii
+          <input type="file" id="ws-photos-gallery" accept="image/*" multiple style="display:none" onchange="handleWysPhotos(this)">
+        </label>
+      </div>
     </div>
     <div class="modal-btns">
       <button class="btn btn-ghost" onclick="closeModal('modal-shipment')">Anuluj</button>
@@ -1311,10 +1323,15 @@ function renderOrderDetail(el, id) {
             </div>`;
           }).join('')}
           ${can('managePhotos')?`
-            <div class="photo-add" onclick="g('photo-in-${id}').click()">
-              <span class="photo-add-icon">📷</span>Dodaj
+            <div class="photo-add" onclick="g('photo-in-camera-${id}').click()">
+              <span class="photo-add-icon">📷</span>Aparat
             </div>
-            <input type="file" id="photo-in-${id}" class="file-input-hidden" accept="image/*" multiple
+            <input type="file" id="photo-in-camera-${id}" class="file-input-hidden" accept="image/*" capture="environment"
+                   onchange="uploadPhotos('${id}',this)">
+            <div class="photo-add" onclick="g('photo-in-gallery-${id}').click()">
+              <span class="photo-add-icon">🖼️</span>Galeria
+            </div>
+            <input type="file" id="photo-in-gallery-${id}" class="file-input-hidden" accept="image/*" multiple
                    onchange="uploadPhotos('${id}',this)">`:''}
         </div>
         ${!can('managePhotos')?`<div style="padding:0 16px 12px;font-size:.75rem;color:var(--muted)">
@@ -1896,10 +1913,15 @@ function renderWysylkaDetail(el, id) {
             </div>`;
           }).join('')}
           ${!roPhotos?`
-            <div class="photo-add" onclick="g('wys-photo-in-${id}').click()">
-              <span class="photo-add-icon">📷</span>Dodaj
+            <div class="photo-add" onclick="g('wys-photo-in-camera-${id}').click()">
+              <span class="photo-add-icon">📷</span>Aparat
             </div>
-            <input type="file" id="wys-photo-in-${id}" class="file-input-hidden" accept="image/*" multiple
+            <input type="file" id="wys-photo-in-camera-${id}" class="file-input-hidden" accept="image/*" capture="environment"
+                   onchange="uploadWysPhotos('${id}',this)">
+            <div class="photo-add" onclick="g('wys-photo-in-gallery-${id}').click()">
+              <span class="photo-add-icon">🖼️</span>Galeria
+            </div>
+            <input type="file" id="wys-photo-in-gallery-${id}" class="file-input-hidden" accept="image/*" multiple
                    onchange="uploadWysPhotos('${id}',this)">`:''}
         </div>
         ${roPhotos?`<div style="padding:0 16px 12px;font-size:.75rem;color:var(--muted)">
