@@ -445,6 +445,10 @@
     .modal-field select:focus,
     .modal-field textarea:focus { border-color:var(--accent); background:#fff; }
     .modal-field textarea { min-height:72px; resize:vertical; }
+    .modal-field input.ocr-pending { border-color:#f97316; background:#fff7ed; }
+    .ocr-hint {
+      font-size:.74rem; color:#f97316; margin-top:5px; line-height:1.4;
+    }
     .modal-btns { display:flex; gap:8px; margin-top:14px; }
     .modal-btns button { flex:1; }
     .modal-err {
@@ -610,7 +614,8 @@
     <div class="modal-title" id="mo-title">Nowe zamówienie</div>
     <div class="modal-field">
       <label>Numer zamówienia *</label>
-      <input type="text" id="mo-num" placeholder="np. 001/08/2026" autocomplete="off">
+      <input type="text" id="mo-num" placeholder="np. 001/08/2026" autocomplete="off" oninput="clearOcrHint()">
+      <div id="mo-num-ocr-hint" class="ocr-hint hidden"></div>
     </div>
     <div class="modal-field">
       <label>Zamawiający *</label>
@@ -1533,6 +1538,7 @@ function openNewOrder() {
   g('mo-save').textContent = 'Utwórz';
   g('mo-title').textContent = 'Nowe zamówienie';
   pendingPhotos = [];
+  clearOcrHint();
   openModal('modal-order');
   renderMoPhotoGrid();
 }
@@ -1605,6 +1611,7 @@ async function handleMoPhotos(input) {
   const files = [...input.files];
   input.value = '';
   if (!files.length) return;
+  const shouldTryOcr = pendingPhotos.length === 0 && !g('mo-num').value.trim();
   showLoad();
   for (const file of files) {
     try {
@@ -1614,6 +1621,45 @@ async function handleMoPhotos(input) {
   }
   hideLoad();
   renderMoPhotoGrid();
+  if (shouldTryOcr && pendingPhotos.length > 0) tryOcrOrderNumber(pendingPhotos[0].data);
+}
+
+// ═══════════════════════════════════════════════════════════
+// OCR numeru zamówienia (Google Cloud Vision) — wyłącznie PODPOWIEDŹ.
+// Nigdy nie zapisuje niczego samodzielnie — użytkownik widzi wynik w
+// edytowalnym polu i musi go zaakceptować/poprawić przed kliknięciem
+// "Utwórz". Jeśli pole numeru jest już wypełnione (ręcznie), OCR się
+// nie uruchamia i niczego nie nadpisuje.
+// ═══════════════════════════════════════════════════════════
+function clearOcrHint() {
+  const hint = g('mo-num-ocr-hint');
+  if (hint) { hint.classList.add('hidden'); hint.textContent = ''; }
+  g('mo-num')?.classList.remove('ocr-pending');
+}
+
+async function tryOcrOrderNumber(photoDataUrl) {
+  const hint = g('mo-num-ocr-hint');
+  if (hint) { hint.classList.remove('hidden'); hint.textContent = '📷 Odczytywanie numeru ze zdjęcia...'; }
+  try {
+    const base64 = photoDataUrl.replace(/^data:[^;]+;base64,/, '');
+    const res = await fns.httpsCallable('extractOrderNumber')({ fileBase64: base64 });
+    const candidate = res.data?.candidate;
+
+    // W międzyczasie modal mógł się zamknąć albo użytkownik wpisał numer ręcznie — nie nadpisuj.
+    const numEl = g('mo-num');
+    if (!numEl || numEl.value.trim()) { if (hint) hint.classList.add('hidden'); return; }
+
+    if (candidate) {
+      numEl.value = candidate;
+      numEl.classList.add('ocr-pending');
+      if (hint) hint.textContent = '📷 Rozpoznano automatycznie ze zdjęcia — sprawdź poprawność przed zapisaniem';
+    } else if (hint) {
+      hint.classList.add('hidden'); hint.textContent = '';
+    }
+  } catch(e) {
+    console.error('OCR error:', e);
+    if (hint) { hint.classList.add('hidden'); hint.textContent = ''; }
+  }
 }
 
 function renderMoPhotoGrid() {

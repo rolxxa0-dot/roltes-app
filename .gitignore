@@ -14,3 +14,6 @@ ui-debug.log
 # Node
 functions/node_modules/
 node_modules/
+
+# Lokalne kopie zapasowe konfiguracji (przed ryzykownymi zmianami)
+_backups/
