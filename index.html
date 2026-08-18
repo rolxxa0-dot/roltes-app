@@ -1478,18 +1478,31 @@ function renderAdminConfig(el) {
     <button class="btn btn-ghost btn-sm mt8" style="width:auto" onclick="openAddCfg('produkty','Nowy produkt','Nazwa produktu')">+ Dodaj produkt</button>`;
 }
 
+const PL_MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+function fmtMonthLabel(monthKey) {
+  const [y, m] = (monthKey||'').split('-').map(Number);
+  return (y && m) ? `${PL_MONTHS[m-1]} ${y}` : monthKey;
+}
+
 function renderAdminDrive(el) {
   el.innerHTML = `<div class="drive-card"><div class="drive-label">Ładowanie danych dysku...</div>
     <div class="drive-bar-wrap"><div class="drive-bar" style="width:0%"></div></div></div>`;
 
-  fns.httpsCallable('getDriveStorage')({})
-    .then(result => {
-      const { limit, usage, folderId } = result.data;
+  Promise.all([
+    fns.httpsCallable('getDriveStorage')({}),
+    db.collection('ocrStats').orderBy(firebase.firestore.FieldPath.documentId(), 'desc').limit(6).get()
+      .catch(() => null), // brak danych/uprawnień nie powinno blokować reszty widoku
+  ])
+    .then(([driveResult, ocrSnap]) => {
+      const { limit, usage, folderId } = driveResult.data;
       const usedGB  = (parseInt(usage)  / 1e9).toFixed(2);
       const totalGB = (parseInt(limit)  / 1e9).toFixed(1);
       const pct     = Math.min(100, Math.round(parseInt(usage) / parseInt(limit) * 100));
       const barCls  = pct > 85 ? 'danger' : pct > 65 ? 'warn' : '';
       const folderUrl = folderId ? `https://drive.google.com/drive/folders/${folderId}` : '#';
+
+      const ocrRows = ocrSnap ? ocrSnap.docs.map(d => ({ month: d.id, ...d.data() })) : [];
+
       el.innerHTML = `
         <div class="drive-card">
           <div class="drive-label">Google Drive — zajętość konta Roltes</div>
@@ -1498,11 +1511,24 @@ function renderAdminDrive(el) {
             ${usedGB} GB / ${totalGB} GB (${pct}%)
           </div>
         </div>
-        <div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);font-size:.85rem;line-height:1.6">
+        <div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);font-size:.85rem;line-height:1.6;margin-bottom:10px">
           <a href="${folderUrl}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">
             📁 Otwórz folder zdjęć na Dysku Google ↗
           </a><br>
           <span style="font-size:.78rem;color:var(--muted)">Każde zamówienie ma swój podfolder z plikami zdjęć.</span>
+        </div>
+        <div class="drive-card">
+          <div class="drive-label">Rozpoznawanie numeru zamówienia ze zdjęcia (OCR)</div>
+          ${ocrRows.length ? `
+            <div style="display:flex;flex-direction:column;gap:2px">
+              ${ocrRows.map(r => `
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:.85rem;padding:7px 0;border-bottom:1px solid var(--border)">
+                  <span>${esc(fmtMonthLabel(r.month))}</span>
+                  <span><strong style="color:var(--accent)">${r.recognized||0}</strong>
+                    <span style="color:var(--muted)"> rozpoznanych / ${r.attempted||0} zdjęć</span>
+                  </span>
+                </div>`).join('')}
+            </div>` : `<div style="font-size:.78rem;color:var(--muted)">Brak danych — OCR nie był jeszcze użyty w żadnym miesiącu.</div>`}
         </div>`;
     })
     .catch(e => {
