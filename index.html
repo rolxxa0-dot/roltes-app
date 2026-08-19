@@ -1479,6 +1479,20 @@ function renderAdminConfig(el) {
 }
 
 const PL_MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+// Rozmiar pliku w jednostce dobranej do skali. Liczone binarnie (1024), bo tak
+// samo liczy Google — dzielenie przez 1e9 pokazywało limit jako 16,11 GB
+// zamiast 15 GB, które widać w interfejsie Dysku.
+function fmtBytes(bytes) {
+  const b = parseInt(bytes) || 0;
+  if (b < 1024) return b + ' B';
+  const kb = b / 1024;
+  if (kb < 1024) return Math.round(kb) + ' KB';
+  const mb = kb / 1024;
+  const trim = v => v.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1').replace('.', ',');
+  if (mb < 1024) return trim(mb) + ' MB';
+  return trim(mb / 1024) + ' GB';
+}
+
 function fmtMonthLabel(monthKey) {
   const [y, m] = (monthKey||'').split('-').map(Number);
   return (y && m) ? `${PL_MONTHS[m-1]} ${y}` : monthKey;
@@ -1495,9 +1509,17 @@ function renderAdminDrive(el) {
   ])
     .then(([driveResult, ocrSnap]) => {
       const { limit, usage, folderId } = driveResult.data;
-      const usedGB  = (parseInt(usage)  / 1e9).toFixed(2);
-      const totalGB = (parseInt(limit)  / 1e9).toFixed(1);
-      const pct     = Math.min(100, Math.round(parseInt(usage) / parseInt(limit) * 100));
+      const used    = parseInt(usage) || 0;
+      const total   = parseInt(limit) || 0;
+      const pct     = total ? Math.min(100, used / total * 100) : 0;
+      // Zdjęcia są mocno kompresowane (ok. 66 KB każde), więc w gigabajtach
+      // zajętość latami pokazywałaby "0.00" — stąd jednostka dobierana do skali.
+      const usedTxt  = fmtBytes(used);
+      const totalTxt = fmtBytes(total);
+      const pctTxt   = pct > 0 && pct < 1 ? pct.toFixed(2).replace('.', ',') : Math.round(pct);
+      // Pasek dostaje minimalną szerokość, żeby przy znikomym zużyciu było
+      // widać, że coś jednak zajmuje miejsce.
+      const barPct  = used > 0 ? Math.max(pct, 0.6) : 0;
       const barCls  = pct > 85 ? 'danger' : pct > 65 ? 'warn' : '';
       const folderUrl = folderId ? `https://drive.google.com/drive/folders/${folderId}` : '#';
 
@@ -1506,9 +1528,9 @@ function renderAdminDrive(el) {
       el.innerHTML = `
         <div class="drive-card">
           <div class="drive-label">Google Drive — zajętość konta Roltes</div>
-          <div class="drive-bar-wrap"><div class="drive-bar ${barCls}" style="width:${pct}%"></div></div>
+          <div class="drive-bar-wrap"><div class="drive-bar ${barCls}" style="width:${barPct}%"></div></div>
           <div style="font-size:.75rem;color:var(--muted);margin-top:8px">
-            ${usedGB} GB / ${totalGB} GB (${pct}%)
+            ${usedTxt} / ${totalTxt} (${pctTxt}%)
           </div>
         </div>
         <div style="background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);font-size:.85rem;line-height:1.6;margin-bottom:10px">
