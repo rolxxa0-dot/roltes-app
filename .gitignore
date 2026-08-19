@@ -17,3 +17,6 @@ node_modules/
 
 # Lokalne kopie zapasowe konfiguracji (przed ryzykownymi zmianami)
 _backups/
+
+# Skrypt jednorazowy do odnawiania tokenu Drive (nie jest sekretem, ale nie należy do repo)
+get-drive-token.js

@@ -1532,9 +1532,16 @@ function renderAdminDrive(el) {
         </div>`;
     })
     .catch(e => {
+      // Wygaśnięcie tokenu ma własny, jednoznaczny komunikat — bez tego wygląda
+      // to jak awaria wdrożenia i kosztuje godzinę diagnostyki (ZMIANY.md 2026-08-19).
+      const tokenErr = isDriveTokenErr(e);
       el.innerHTML = `<div class="drive-card">
-        <div class="drive-label" style="color:var(--nowe)">Błąd połączenia z Drive: ${esc(e.message||'Nieznany błąd')}</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-top:6px">Sprawdź czy Cloud Functions są wdrożone i skonfigurowane.</div>
+        <div class="drive-label" style="color:var(--nowe)">${
+          tokenErr ? esc(e.message)
+                   : 'Błąd połączenia z Drive: ' + esc(e.message||'Nieznany błąd')}</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:6px">${
+          tokenErr ? 'Zdjęcia nie będą się wgrywać na Dysk, dopóki token nie zostanie odnowiony. Administrator dostał powiadomienie mailem.'
+                   : 'Sprawdź czy Cloud Functions są wdrożone i skonfigurowane.'}</div>
       </div>`;
     });
 }
@@ -1618,7 +1625,7 @@ async function createOrder() {
           order.log.push({ timestamp: nowISO(), username: u.username, displayName: u.displayName,
                            action: 'Dodanie zdjęcia: ' + ph.name });
           await db.collection('orders').doc(id).update({ zdjecia: order.zdjecia, log: order.log });
-        } catch(e) { toast('Błąd uploadu: ' + ph.name); }
+        } catch(e) { toastErr(e, 'Błąd uploadu: ' + ph.name); if (isDriveTokenErr(e)) break; }
       }
       hideLoad();
     }
@@ -1791,7 +1798,7 @@ function deleteOrder(id) {
       toast('Zamówienie usunięte');
       navigate('orders');
     } catch(e) {
-      toast('Błąd usuwania: ' + (e.message || e));
+      toastErr(e, 'Błąd usuwania: ' + (e.message || e));
     } finally {
       hideLoad();
     }
@@ -1827,7 +1834,11 @@ async function uploadPhotos(orderId, input) {
         action: 'Dodanie zdjęcia: ' + file.name,
       }];
       await db.collection('orders').doc(orderId).update({ zdjecia: order.zdjecia, log: order.log });
-    } catch(e) { console.error(e); toast('Błąd uploadu: ' + file.name); }
+    } catch(e) {
+      console.error(e);
+      toastErr(e, 'Błąd uploadu: ' + file.name);
+      if (isDriveTokenErr(e)) break;   // kolejne pliki i tak się nie wgrają
+    }
   }
   hideLoad();
   renderOrderDetail(g('main'), orderId);
@@ -1849,7 +1860,7 @@ function deletePhoto(orderId, zid) {
       }];
       await db.collection('orders').doc(orderId).update({ zdjecia: order.zdjecia, log: order.log });
       renderOrderDetail(g('main'), orderId);
-    } catch(e) { toast('Błąd usuwania: ' + (e.message || e)); }
+    } catch(e) { toastErr(e, 'Błąd usuwania: ' + (e.message || e)); }
     finally { hideLoad(); }
   });
 }
@@ -2093,7 +2104,7 @@ async function createWysylka() {
           w.log.push({ timestamp: nowISO(), username: u.username, displayName: u.displayName,
                        action: 'Dodanie zdjęcia: ' + ph.name });
           await db.collection('wysylki').doc(id).update({ zdjecia: w.zdjecia, log: w.log });
-        } catch(e) { toast('Błąd uploadu: ' + ph.name); }
+        } catch(e) { toastErr(e, 'Błąd uploadu: ' + ph.name); if (isDriveTokenErr(e)) break; }
       }
       hideLoad();
     }
@@ -2179,7 +2190,7 @@ function deleteWysylka(id) {
       toast('Wysyłka usunięta');
       navigate('wysylki');
     } catch(e) {
-      toast('Błąd usuwania: ' + (e.message || e));
+      toastErr(e, 'Błąd usuwania: ' + (e.message || e));
     } finally {
       hideLoad();
     }
@@ -2215,7 +2226,11 @@ async function uploadWysPhotos(wysId, input) {
         action: 'Dodanie zdjęcia: ' + file.name,
       }];
       await db.collection('wysylki').doc(wysId).update({ zdjecia: w.zdjecia, log: w.log });
-    } catch(e) { console.error(e); toast('Błąd uploadu: ' + file.name); }
+    } catch(e) {
+      console.error(e);
+      toastErr(e, 'Błąd uploadu: ' + file.name);
+      if (isDriveTokenErr(e)) break;   // kolejne pliki i tak się nie wgrają
+    }
   }
   hideLoad();
   renderWysylkaDetail(g('main'), wysId);
@@ -2237,7 +2252,7 @@ function deleteWysPhoto(wysId, zid) {
       }];
       await db.collection('wysylki').doc(wysId).update({ zdjecia: w.zdjecia, log: w.log });
       renderWysylkaDetail(g('main'), wysId);
-    } catch(e) { toast('Błąd usuwania: ' + (e.message || e)); }
+    } catch(e) { toastErr(e, 'Błąd usuwania: ' + (e.message || e)); }
     finally { hideLoad(); }
   });
 }
@@ -2578,6 +2593,13 @@ function fmtDate(s)     { if(!s) return '—'; try { return new Date(s+'T00:00:0
 function fmtDateTime(s) { if(!s) return '—'; try { return new Date(s).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch { return s; } }
 
 let toastTmr;
+// ── Wygaśnięcie tokenu Google Drive ───────────────────────
+// Cloud Functions zwracają 'failed-precondition' wyłącznie w tym jednym
+// przypadku — wtedy pokazujemy komunikat z serwera zamiast ogólnego błędu.
+function isDriveTokenErr(e) { return /failed-precondition/.test(String(e?.code || '')); }
+function errMsg(e, fallback) { return isDriveTokenErr(e) ? e.message : fallback; }
+function toastErr(e, fallback) { toast(errMsg(e, fallback), isDriveTokenErr(e) ? 7000 : 2600); }
+
 function toast(msg, dur=2600) {
   const el=g('toast'); el.textContent=msg; el.classList.add('show');
   clearTimeout(toastTmr); toastTmr=setTimeout(()=>el.classList.remove('show'),dur);
