@@ -449,6 +449,21 @@
     .ocr-hint {
       font-size:.74rem; color:#f97316; margin-top:5px; line-height:1.4;
     }
+    /* Ostrzeżenie o powtórzonym numerze — nie blokuje zapisu, tylko wymusza
+       świadomą decyzję: poprawić numer albo potwierdzić przyciskiem. */
+    .dup-warn {
+      margin-top:7px; padding:9px 11px; border-radius:8px; line-height:1.45;
+      background:#fff7ed; border:1.5px solid #fdba74; color:#9a3412; font-size:.76rem;
+    }
+    .dup-warn strong { color:#7c2d12; }
+    .dup-warn ul { margin:5px 0 0; padding-left:17px; }
+    .dup-warn li { margin-bottom:2px; }
+    .dup-warn .dup-actions { display:flex; gap:8px; margin-top:9px; }
+    .dup-warn button {
+      flex:1; padding:8px 10px; border-radius:7px; font-size:.75rem; font-weight:700;
+      border:1.5px solid #ea580c; background:#fff; color:#c2410c; cursor:pointer;
+    }
+    .dup-warn button.dup-go { background:#ea580c; color:#fff; }
     .modal-btns { display:flex; gap:8px; margin-top:14px; }
     .modal-btns button { flex:1; }
     .modal-err {
@@ -614,8 +629,9 @@
     <div class="modal-title" id="mo-title">Nowe zamówienie</div>
     <div class="modal-field">
       <label>Numer zamówienia *</label>
-      <input type="text" id="mo-num" placeholder="np. 001/08/2026" autocomplete="off" oninput="clearOcrHint()">
+      <input type="text" id="mo-num" placeholder="np. 001/08/2026" autocomplete="off" oninput="clearOcrHint(); clearDupWarn('mo')">
       <div id="mo-num-ocr-hint" class="ocr-hint hidden"></div>
+      <div id="mo-dup-warn" class="dup-warn hidden"></div>
     </div>
     <div class="modal-field">
       <label>Zamawiający *</label>
@@ -683,7 +699,8 @@
     </div>
     <div class="modal-field">
       <label>Tytuł 2</label>
-      <input type="text" id="ws-tytul2" placeholder="Dowolny tekst" autocomplete="off">
+      <input type="text" id="ws-tytul2" placeholder="Dowolny tekst" autocomplete="off" oninput="clearDupWarn('ws')">
+      <div id="ws-dup-warn" class="dup-warn hidden"></div>
     </div>
     <div class="modal-field">
       <label>Treść</label>
@@ -1581,6 +1598,74 @@ function renderAdminRoles(el) {
 // ═══════════════════════════════════════════════════════════
 let pendingPhotos = [];
 
+// ═══════════════════════════════════════════════════════════
+// DUPLIKATY NUMERÓW  (zamówienia: numerZamowienia, wysyłki: tytul2)
+//
+// Ostrzeżenie, nie blokada — w bazie SĄ już powtórzone numery (np. 1392/07/26),
+// więc twarde zakazanie duplikatów byłoby niezgodne z tym, jak firma pracuje.
+// Użytkownik musi tylko świadomie potwierdzić, że wie o powtórzeniu.
+// ═══════════════════════════════════════════════════════════
+let dupConfirmed = { mo: false, ws: false };   // resetowane przy otwarciu formularza i zmianie numeru
+
+// Porównanie odporne na spacje i wielkość liter: "1392/07/26" = " 1392/07/26 "
+function normNum(s) { return String(s ?? '').trim().toLowerCase().replace(/\s+/g, ''); }
+
+async function findDuplicates(col, field, value) {
+  const norm = normNum(value);
+  if (!norm) return [];
+
+  const found = new Map();
+
+  // 1) Zapytanie do serwera — łapie wpisy dodane przez inną osobę już po tym,
+  //    jak nasz cache został załadowany przy logowaniu.
+  try {
+    const snap = await db.collection(col).where(field, '==', String(value).trim()).limit(10).get();
+    snap.docs.forEach(d => found.set(d.id, { id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error('Sprawdzanie duplikatów (serwer):', e);   // brak sieci nie może blokować zapisu
+  }
+
+  // 2) Cache — łapie różnice w spacjach i wielkości liter, których zapytanie
+  //    Firestore (dopasowanie dokładne) by nie znalazło.
+  const local = col === 'orders' ? cache.orders : cache.wysylki;
+  local.filter(o => normNum(o[field]) === norm).forEach(o => found.set(o.id, o));
+
+  return [...found.values()];
+}
+
+function clearDupWarn(prefix) {
+  dupConfirmed[prefix] = false;
+  const el = g(`${prefix}-dup-warn`);
+  if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+}
+
+function showDupWarn(prefix, dups, kind, value, onConfirm) {
+  const el = g(`${prefix}-dup-warn`);
+  const many = dups.length > 1;
+  const lista = dups.slice(0, 5).map(d => {
+    const opis = kind === 'zamówienie'
+      ? `${esc(d.zamawiajacy || 'bez zamawiającego')} · ${fmtDate(d.dataZamowienia)}`
+      : `${fmtDate(d.tytul1)}${d.tresc ? ' · ' + esc(String(d.tresc).slice(0, 40)) : ''}`;
+    return `<li>${opis}</li>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div><strong>${kind === 'zamówienie' ? 'Zamówienie' : 'Wysyłka'} o numerze „${esc(value)}"
+      już ${many ? `istnieje (${dups.length} razy)` : 'istnieje'}.</strong></div>
+    <ul>${lista}</ul>
+    <div style="margin-top:7px">Zmień numer w polu wyżej albo potwierdź, że ma być taki sam.</div>
+    <div class="dup-actions">
+      <button type="button" onclick="g('${prefix === 'mo' ? 'mo-num' : 'ws-tytul2'}').focus()">Zmienię numer</button>
+      <button type="button" class="dup-go" id="${prefix}-dup-go">Utwórz mimo to</button>
+    </div>`;
+  el.classList.remove('hidden');
+  g(`${prefix}-dup-go`).onclick = () => {
+    dupConfirmed[prefix] = true;
+    el.classList.add('hidden');
+    onConfirm();
+  };
+}
+
 function openNewOrder() {
   const cfg = cache.cfg;
   g('mo-product').innerHTML = cfg.produkty.map(p=>`<option>${esc(p)}</option>`).join('');
@@ -1595,6 +1680,7 @@ function openNewOrder() {
   pendingPhotos = [];
   moOcrAttempted = false;
   clearOcrHint();
+  clearDupWarn('mo');
   openModal('modal-order');
   renderMoPhotoGrid();
 }
@@ -1605,6 +1691,22 @@ async function createOrder() {
   if (!num || !client) { g('mo-err').textContent = 'Wypełnij numer i zamawiającego.'; return; }
 
   const btn = g('mo-save');
+
+  // Sprawdzenie duplikatu PRZED jakimkolwiek zapisem do bazy. Przy potwierdzeniu
+  // przyciskiem „Utwórz mimo to" createOrder woła się ponownie z dupConfirmed.mo.
+  if (!dupConfirmed.mo) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    const dups = await findDuplicates('orders', 'numerZamowienia', num);
+    btn.disabled = false;
+    btn.textContent = 'Utwórz';
+    if (dups.length) {
+      g('mo-err').textContent = '';
+      showDupWarn('mo', dups, 'zamówienie', num, createOrder);
+      return;
+    }
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
@@ -2078,6 +2180,7 @@ function openNewWysylka() {
   g('ws-tytul2').value = '';
   g('ws-tresc').value  = '';
   g('ws-err').textContent = '';
+  clearDupWarn('ws');
   g('ws-save').disabled = false;
   g('ws-save').textContent = 'Utwórz';
   pendingWysPhotos = [];
@@ -2090,6 +2193,23 @@ async function createWysylka() {
   if (!tytul1) { g('ws-err').textContent = 'Wybierz datę (tytuł 1).'; return; }
 
   const btn = g('ws-save');
+
+  // Tytuł 2 pełni w wysyłkach rolę numeru. Jest polem opcjonalnym — pusty
+  // nie jest duplikatem, więc sprawdzamy tylko gdy coś w nim jest.
+  const tytul2 = g('ws-tytul2').value.trim();
+  if (tytul2 && !dupConfirmed.ws) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    const dups = await findDuplicates('wysylki', 'tytul2', tytul2);
+    btn.disabled = false;
+    btn.textContent = 'Utwórz';
+    if (dups.length) {
+      g('ws-err').textContent = '';
+      showDupWarn('ws', dups, 'wysyłka', tytul2, createWysylka);
+      return;
+    }
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
