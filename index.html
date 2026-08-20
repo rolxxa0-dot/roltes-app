@@ -498,6 +498,16 @@
     .empty-icon { font-size:3rem; margin-bottom:10px; }
     .empty-text { font-size:.88rem; }
 
+    /* Pasek braku połączenia z bazą. Na górze, bo toast zajmuje dół ekranu.
+       Widoczny tylko gdy realnie nie ma łączności z Firestore. */
+    .net-bar {
+      position:fixed; top:0; left:0; right:0; z-index:400;
+      background:#b91c1c; color:#fff; text-align:center;
+      padding:7px 12px; font-size:.78rem; font-weight:600; line-height:1.35;
+      box-shadow:0 2px 8px rgba(0,0,0,.25);
+    }
+    .net-bar.hidden { display:none; }
+
     .toast {
       position:fixed; bottom:80px; left:50%;
       transform:translateX(-50%) translateY(16px);
@@ -584,6 +594,7 @@
 <div class="loading-cover" id="loading"><div class="ring"></div></div>
 
 <!-- Toast -->
+<div class="net-bar hidden" id="net-bar">⚠️ Brak połączenia z bazą — zmiany nie zapiszą się</div>
 <div class="toast" id="toast"></div>
 
 <!-- Image fullscreen -->
@@ -958,6 +969,7 @@ function presenceStart() {
   presenceSet(true);
   _heartbeat = setInterval(() => presenceSet(true), 60_000);
   startUsersListener();
+  netWatchStart();
   window.addEventListener('beforeunload', presenceStop);
 }
 
@@ -965,6 +977,7 @@ function presenceStop() {
   clearInterval(_heartbeat);
   _heartbeat = null;
   stopUsersListener();
+  netWatchStop();
   presenceSet(false);
 }
 
@@ -1599,6 +1612,62 @@ function renderAdminRoles(el) {
 let pendingPhotos = [];
 
 // ═══════════════════════════════════════════════════════════
+// STAN POŁĄCZENIA Z BAZĄ
+//
+// `navigator.onLine` mówi tylko tyle, że system widzi jakąś sieć — telefon
+// podpięty do wifi bez internetu nadal raportuje "online". Prawdziwy sygnał
+// daje sam Firestore: nasłuch z `includeMetadataChanges` na małym dokumencie
+// (config/default) ustawia `fromCache = true`, gdy SDK nie rozmawia z serwerem.
+//
+// Dlaczego to w ogóle jest potrzebne: zapis przez `set()` w trybie offline
+// aktualizuje pamięć lokalną, ale zwrócona obietnica czeka na potwierdzenie
+// z serwera i potrafi wisieć bez końca. Bez tego użytkownik widział kręcące
+// się kółko i nic więcej. Persystencja offline NIE jest włączona, więc taki
+// niepotwierdzony zapis przepada po zamknięciu aplikacji.
+// ═══════════════════════════════════════════════════════════
+let dbFromCache = false;      // czy dane lecą z cache zamiast z serwera
+let netUnsub    = null;
+
+function isConnected() { return navigator.onLine && !dbFromCache; }
+
+function renderNetBar() {
+  const bar = g('net-bar');
+  if (!bar) return;
+  bar.classList.toggle('hidden', isConnected());
+}
+
+function netWatchStart() {
+  if (netUnsub) return;
+  netUnsub = db.collection('config').doc('default')
+    .onSnapshot({ includeMetadataChanges: true },
+      snap => { dbFromCache = snap.metadata.fromCache; renderNetBar(); },
+      err  => { console.error('Nasłuch połączenia:', err); dbFromCache = true; renderNetBar(); });
+  window.addEventListener('online',  renderNetBar);
+  window.addEventListener('offline', renderNetBar);
+}
+
+function netWatchStop() {
+  if (netUnsub) { netUnsub(); netUnsub = null; }
+  dbFromCache = false;
+  renderNetBar();
+}
+
+// Zapis, który nie może wisieć w nieskończoność. Uwaga: przekroczenie limitu
+// NIE znaczy "na pewno nie zapisano" — Firestore trzyma zapis w kolejce i może
+// go dosłać, gdy zasięg wróci. Komunikat dla użytkownika musi to oddawać.
+function withTimeout(promise, ms = 15000) {
+  let t;
+  return Promise.race([
+    promise.finally(() => clearTimeout(t)),
+    new Promise((_, rej) => { t = setTimeout(() => rej(new Error('ZAPIS_TIMEOUT')), ms); }),
+  ]);
+}
+
+const NIEPOTWIERDZONY_ZAPIS =
+  'Serwer nie potwierdził zapisu — prawdopodobnie zerwane połączenie. ' +
+  'NIE twórz go drugi raz: sprawdź listę po powrocie zasięgu, wpis może się tam pojawić.';
+
+// ═══════════════════════════════════════════════════════════
 // DUPLIKATY NUMERÓW  (zamówienia: numerZamowienia, wysyłki: tytul2)
 //
 // Ostrzeżenie, nie blokada — w bazie SĄ już powtórzone numery (np. 1392/07/26),
@@ -1692,6 +1761,15 @@ async function createOrder() {
 
   const btn = g('mo-save');
 
+  // Bez połączenia zapis i tak by nie doszedł do serwera, a `await set()`
+  // wisiałby bez końca. Lepiej powiedzieć to wprost, zanim cokolwiek zrobimy.
+  if (!isConnected()) {
+    g('mo-err').textContent =
+      'Brak połączenia z bazą — zamówienia nie da się teraz zapisać. ' +
+      'Poczekaj, aż czerwony pasek u góry zniknie, i spróbuj ponownie.';
+    return;
+  }
+
   // Sprawdzenie duplikatu PRZED jakimkolwiek zapisem do bazy. Przy potwierdzeniu
   // przyciskiem „Utwórz mimo to" createOrder woła się ponownie z dupConfirmed.mo.
   if (!dupConfirmed.mo) {
@@ -1731,7 +1809,7 @@ async function createOrder() {
   };
 
   try {
-    await db.collection('orders').doc(id).set(order);
+    await withTimeout(db.collection('orders').doc(id).set(order));
     cache.orders.unshift(order);
 
     if (pendingPhotos.length > 0) {
@@ -1759,7 +1837,9 @@ async function createOrder() {
     toast('Zamówienie utworzone');
     navigate('order', { id });
   } catch(e) {
-    g('mo-err').textContent = 'Błąd: ' + (e.message || e);
+    g('mo-err').textContent = e.message === 'ZAPIS_TIMEOUT'
+      ? NIEPOTWIERDZONY_ZAPIS
+      : 'Błąd: ' + (e.message || e);
     btn.disabled = false;
     btn.textContent = 'Utwórz';
   }
@@ -2194,6 +2274,13 @@ async function createWysylka() {
 
   const btn = g('ws-save');
 
+  if (!isConnected()) {
+    g('ws-err').textContent =
+      'Brak połączenia z bazą — wysyłki nie da się teraz zapisać. ' +
+      'Poczekaj, aż czerwony pasek u góry zniknie, i spróbuj ponownie.';
+    return;
+  }
+
   // Tytuł 2 pełni w wysyłkach rolę numeru. Jest polem opcjonalnym — pusty
   // nie jest duplikatem, więc sprawdzamy tylko gdy coś w nim jest.
   const tytul2 = g('ws-tytul2').value.trim();
@@ -2228,7 +2315,7 @@ async function createWysylka() {
   };
 
   try {
-    await db.collection('wysylki').doc(id).set(w);
+    await withTimeout(db.collection('wysylki').doc(id).set(w));
     cache.wysylki.unshift(w);
 
     if (pendingWysPhotos.length > 0) {
@@ -2256,7 +2343,9 @@ async function createWysylka() {
     toast('Wysyłka utworzona');
     navigate('wysylka', { id });
   } catch(e) {
-    g('ws-err').textContent = 'Błąd: ' + (e.message || e);
+    g('ws-err').textContent = e.message === 'ZAPIS_TIMEOUT'
+      ? NIEPOTWIERDZONY_ZAPIS
+      : 'Błąd: ' + (e.message || e);
     btn.disabled = false;
     btn.textContent = 'Utwórz';
   }
