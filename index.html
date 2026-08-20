@@ -2056,7 +2056,7 @@ function deletePhoto(orderId, zid) {
     const u = cache.me;
     showLoad();
     try {
-      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id });
+      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id, collection: 'orders', budowaId: orderId });
       order.zdjecia = (order.zdjecia||[]).filter(z=>z.id!==zid);
       order.log = [...(order.log||[]), {
         timestamp: nowISO(), username: u.username, displayName: u.displayName,
@@ -2475,7 +2475,7 @@ function deleteWysPhoto(wysId, zid) {
     const u = cache.me;
     showLoad();
     try {
-      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id });
+      if (z?.id) await fns.httpsCallable('deletePhoto')({ fileId: z.id, collection: 'wysylki', budowaId: wysId });
       w.zdjecia = (w.zdjecia||[]).filter(z=>z.id!==zid);
       w.log = [...(w.log||[]), {
         timestamp: nowISO(), username: u.username, displayName: u.displayName,
